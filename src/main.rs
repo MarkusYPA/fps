@@ -36,16 +36,18 @@ impl Player {
 
         // Slow down movement when strafing and going backward or forward
         let mut slower = 1.0;
-        if input.left_alt_pressed && (input.left_pressed || input.right_pressed) && (input.up_pressed || input.down_pressed) {
+        if input.left_alt_pressed
+            && (input.left_pressed || input.right_pressed)
+            && (input.up_pressed || input.down_pressed)
+        {
             slower = 0.707;
         }
-
-        
 
         if input.up_pressed {
             new_x += self.angle.cos() * self.move_speed * slower;
             new_y += self.angle.sin() * self.move_speed * slower;
         }
+
         if input.down_pressed {
             new_x -= self.angle.cos() * self.move_speed * slower;
             new_y -= self.angle.sin() * self.move_speed * slower;
@@ -158,51 +160,59 @@ impl Renderer {
             }
         }
 
-        // Raycasting
+        // Raycasting per column
         let player = &game_state.player;
         for x in 0..WIDTH {
-            let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0; // x-coordinate in camera space
-            let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin()); // 0.66 is the camera field of view?
+            // Map screen x coordinate to camera space (-1.0 left .. 1.0 right)
+            let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
+
+            // Ray direction for this column: Offset forward vector by camera_x.
+            // The 0.66 is basically half the FOV scaling factor.
+            let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
             let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
 
+            // Current square of the map the ray starts in
             let mut map_x = player.x as usize;
             let mut map_y = player.y as usize;
 
+            // Length of ray from one x- or y-wall to the next
             let delta_dist_x = (1.0 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
             let delta_dist_y = (1.0 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
 
+            // Step direction (+1 or -1), and distance to first wall
             let step_x;
             let step_y;
+            let mut wall_dist_x;
+            let mut wall_dist_y;
 
-            let mut side_dist_x;
-            let mut side_dist_y;
-
+            // Figure out step and initial wall distances
             if ray_dir_x < 0.0 {
                 step_x = -1;
-                side_dist_x = (player.x - map_x as f32) * delta_dist_x;
+                wall_dist_x = (player.x - map_x as f32) * delta_dist_x;
             } else {
                 step_x = 1;
-                side_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
+                wall_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
             }
             if ray_dir_y < 0.0 {
                 step_y = -1;
-                side_dist_y = (player.y - map_y as f32) * delta_dist_y;
+                wall_dist_y = (player.y - map_y as f32) * delta_dist_y;
             } else {
                 step_y = 1;
-                side_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
+                wall_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
             }
 
+            // Perform DDA (Digital Differential Analyzer) until wall is hit
             let mut hit = false;
-            let mut side = 0; // 0 for x-side, 1 for y-side
+            let mut wall_type = 0; // 0 = hit nort-south wall , 1 = hit east-west wall
             while !hit {
-                if side_dist_x < side_dist_y {
-                    side_dist_x += delta_dist_x;
+                if wall_dist_x < wall_dist_y {
+                    wall_dist_x += delta_dist_x;
                     map_x = (map_x as isize + step_x) as usize;
-                    side = 0;
+                    wall_type = 0;
                 } else {
-                    side_dist_y += delta_dist_y;
+                    wall_dist_y += delta_dist_y;
                     map_y = (map_y as isize + step_y) as usize;
-                    side = 1;
+                    wall_type = 1;
                 }
 
                 if game_state.world.get_tile(map_x, map_y) == 1 {
@@ -210,8 +220,9 @@ impl Renderer {
                 }
             }
 
+            // Distance to wall (perpendicular to avoid fisheye effect)
             let perp_wall_dist;
-            if side == 0 {
+            if wall_type == 0 {
                 perp_wall_dist =
                     (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x;
             } else {
@@ -219,11 +230,15 @@ impl Renderer {
                     (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y;
             }
 
+            // Wall height and corresponding line
             let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
             let draw_start = -line_height / 2 + HEIGHT as isize / 2;
             let draw_end = line_height / 2 + HEIGHT as isize / 2;
-            let wall_color = if side == 1 { 0x008A7755 } else { 0x00695A41 }; // lighter or darker
 
+            // Wall darkness from its orientation
+            let wall_color = if wall_type == 1 { 0x008A7755 } else { 0x00695A41 };
+
+            // Wall slice into buffer
             for y in 0..HEIGHT {
                 if y as isize >= draw_start && y as isize <= draw_end {
                     self.buffer[y * WIDTH + x] = wall_color;
