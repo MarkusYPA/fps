@@ -9,6 +9,49 @@ struct Player {
     angle: f32,
 }
 
+impl Player {
+    fn move_forward(&mut self, speed: f32, world: &World) {
+        let new_x = self.x + self.angle.cos() * speed;
+        let new_y = self.y + self.angle.sin() * speed;
+        self.check_collision_and_move(new_x, new_y, world);
+    }
+
+    fn move_backward(&mut self, speed: f32, world: &World) {
+        let new_x = self.x - self.angle.cos() * speed;
+        let new_y = self.y - self.angle.sin() * speed;
+        self.check_collision_and_move(new_x, new_y, world);
+    }
+
+    fn strafe_left(&mut self, speed: f32, world: &World) {
+        let new_x = self.x + self.angle.sin() * speed;
+        let new_y = self.y - self.angle.cos() * speed;
+        self.check_collision_and_move(new_x, new_y, world);
+    }
+
+    fn strafe_right(&mut self, speed: f32, world: &World) {
+        let new_x = self.x - self.angle.sin() * speed;
+        let new_y = self.y + self.angle.cos() * speed;
+        self.check_collision_and_move(new_x, new_y, world);
+    }
+
+    fn turn_left(&mut self, speed: f32) {
+        self.angle -= speed;
+    }
+
+    fn turn_right(&mut self, speed: f32) {
+        self.angle += speed;
+    }
+
+    fn check_collision_and_move(&mut self, new_x: f32, new_y: f32, world: &World) {
+        if world.get_tile(new_x as usize, self.y as usize) == 0 {
+            self.x = new_x;
+        }
+        if world.get_tile(self.x as usize, new_y as usize) == 0 {
+            self.y = new_y;
+        }
+    }
+}
+
 struct World {
     map: Vec<Vec<u8>>,
 }
@@ -39,69 +82,24 @@ impl World {
 }
 
 struct GameState {
-    player: Player,
+    players: Vec<Player>,
     world: World,
 }
 
 impl GameState {
     fn new() -> Self {
         GameState {
-            player: Player {
+            players: vec![Player {
                 x: 1.5,
                 y: 1.5,
                 angle: std::f32::consts::PI / 2.0,
-            },
+            }],
             world: World::new(),
         }
     }
 
-    fn update(&mut self, window: &Window) {
-        let move_speed = 0.075;
-        let strafe_speed = 0.05;
-        let rot_speed = 0.05;
-
-        let mut new_x = self.player.x;
-        let mut new_y = self.player.y;
-
-        // Move back and forth
-        if window.is_key_down(Key::Up) {
-            new_x += self.player.angle.cos() * move_speed;
-            new_y += self.player.angle.sin() * move_speed;
-        }
-        if window.is_key_down(Key::Down) {
-            new_x -= self.player.angle.cos() * move_speed;
-            new_y -= self.player.angle.sin() * move_speed;
-        }
-
-        // Strafe left and right
-        if window.is_key_down(Key::LeftAlt) {
-            if window.is_key_down(Key::Left) {
-                new_x += self.player.angle.sin() * strafe_speed;
-                new_y -= self.player.angle.cos() * strafe_speed;
-            }
-            if window.is_key_down(Key::Right) {
-                new_x -= self.player.angle.sin() * strafe_speed;
-                new_y += self.player.angle.cos() * strafe_speed;
-            }
-        }
-
-        // Collision detection
-        if self.world.get_tile(new_x as usize, self.player.y as usize) == 0 {
-            self.player.x = new_x;
-        }
-        if self.world.get_tile(self.player.x as usize, new_y as usize) == 0 {
-            self.player.y = new_y;
-        }
-
-        // turn left and right
-        if !window.is_key_down(Key::LeftAlt) {
-            if window.is_key_down(Key::Left) {
-                self.player.angle -= rot_speed;
-            }
-            if window.is_key_down(Key::Right) {
-                self.player.angle += rot_speed;
-            }
-        }
+    fn update(&mut self, _window: &Window) {
+        // Input is now handled by the `handle_input` function
     }
 }
 
@@ -130,15 +128,16 @@ impl Renderer {
         }
 
         // Raycasting
+        let player = &game_state.players[0];
         for x in 0..WIDTH {
             let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0; // x-coordinate in camera space
             let ray_dir_x =
-                game_state.player.angle.cos() + 0.66 * camera_x * (-game_state.player.angle.sin()); // 0.66 is the camera field of view?
+                player.angle.cos() + 0.66 * camera_x * (-player.angle.sin()); // 0.66 is the camera field of view?
             let ray_dir_y =
-                game_state.player.angle.sin() + 0.66 * camera_x * game_state.player.angle.cos();
+                player.angle.sin() + 0.66 * camera_x * player.angle.cos();
 
-            let mut map_x = game_state.player.x as usize;
-            let mut map_y = game_state.player.y as usize;
+            let mut map_x = player.x as usize;
+            let mut map_y = player.y as usize;
 
             let delta_dist_x = (1.0 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
             let delta_dist_y = (1.0 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
@@ -151,17 +150,17 @@ impl Renderer {
 
             if ray_dir_x < 0.0 {
                 step_x = -1;
-                side_dist_x = (game_state.player.x - map_x as f32) * delta_dist_x;
+                side_dist_x = (player.x - map_x as f32) * delta_dist_x;
             } else {
                 step_x = 1;
-                side_dist_x = (map_x as f32 + 1.0 - game_state.player.x) * delta_dist_x;
+                side_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
             }
             if ray_dir_y < 0.0 {
                 step_y = -1;
-                side_dist_y = (game_state.player.y - map_y as f32) * delta_dist_y;
+                side_dist_y = (player.y - map_y as f32) * delta_dist_y;
             } else {
                 step_y = 1;
-                side_dist_y = (map_y as f32 + 1.0 - game_state.player.y) * delta_dist_y;
+                side_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
             }
 
             let mut hit = false;
@@ -185,10 +184,10 @@ impl Renderer {
             let perp_wall_dist;
             if side == 0 {
                 perp_wall_dist =
-                    (map_x as f32 - game_state.player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x;
+                    (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x;
             } else {
                 perp_wall_dist =
-                    (map_y as f32 - game_state.player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y;
+                    (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y;
             }
 
             let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
@@ -203,6 +202,40 @@ impl Renderer {
                     self.buffer[y * WIDTH + x] = wall_color;
                 }
             }
+        }
+    }
+}
+
+fn handle_input(window: &Window, game_state: &mut GameState) {
+    let move_speed = 0.075;
+    let strafe_speed = 0.05;
+    let rot_speed = 0.05;
+
+    // Assuming we are only controlling the first player for now
+    let player = &mut game_state.players[0];
+
+    if window.is_key_down(Key::Up) {
+        player.move_forward(move_speed, &game_state.world);
+    }
+    if window.is_key_down(Key::Down) {
+        player.move_backward(move_speed, &game_state.world);
+    }
+
+    if window.is_key_down(Key::LeftAlt) {
+        if window.is_key_down(Key::Left) {
+            player.strafe_left(strafe_speed, &game_state.world);
+        }
+        if window.is_key_down(Key::Right) {
+            player.strafe_right(strafe_speed, &game_state.world);
+        }
+    }
+
+    if !window.is_key_down(Key::LeftAlt) {
+        if window.is_key_down(Key::Left) {
+            player.turn_left(rot_speed);
+        }
+        if window.is_key_down(Key::Right) {
+            player.turn_right(rot_speed);
         }
     }
 }
@@ -225,7 +258,7 @@ fn main() {
     let mut renderer = Renderer::new();
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        game_state.update(&window);
+        handle_input(&window, &mut game_state);
         renderer.render(&game_state);
 
         window
