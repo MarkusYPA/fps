@@ -47,8 +47,8 @@ impl GameState {
     fn new() -> Self {
         GameState {
             player: Player {
-                x: 2.0,
-                y: 2.0,
+                x: 1.5,
+                y: 1.5,
                 angle: std::f32::consts::PI / 2.0,
             },
             world: World::new(),
@@ -71,11 +71,10 @@ impl GameState {
             new_y -= self.player.angle.sin() * move_speed;
         }
 
-        // Collision detection for X-axis
+        // Collision detection
         if self.world.get_tile(new_x as usize, self.player.y as usize) == 0 {
             self.player.x = new_x;
         }
-        // Collision detection for Y-axis
         if self.world.get_tile(self.player.x as usize, new_y as usize) == 0 {
             self.player.y = new_y;
         }
@@ -104,7 +103,7 @@ impl Renderer {
         // Clear the buffer (floor and ceiling)
         for y in 0..HEIGHT / 2 {
             for x in 0..WIDTH {
-                self.buffer[y * WIDTH + x] = 0x00AAAAFF; // Ceiling (light blue)
+                self.buffer[y * WIDTH + x] = 0x00AACCFF; // Ceiling (light blue)
             }
         }
         for y in HEIGHT / 2..HEIGHT {
@@ -117,7 +116,7 @@ impl Renderer {
         for x in 0..WIDTH {
             let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0; // x-coordinate in camera space
             let ray_dir_x =
-                game_state.player.angle.cos() + 0.66 * camera_x * (-game_state.player.angle.sin());
+                game_state.player.angle.cos() + 0.66 * camera_x * (-game_state.player.angle.sin()); // 0.66 is the camera field of view?
             let ray_dir_y =
                 game_state.player.angle.sin() + 0.66 * camera_x * game_state.player.angle.cos();
 
@@ -127,8 +126,8 @@ impl Renderer {
             let delta_dist_x = (1.0 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
             let delta_dist_y = (1.0 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
 
-            let mut step_x;
-            let mut step_y;
+            let step_x;
+            let step_y;
 
             let mut side_dist_x;
             let mut side_dist_y;
@@ -180,7 +179,7 @@ impl Renderer {
             let draw_start = -line_height / 2 + HEIGHT as isize / 2;
             let draw_end = line_height / 2 + HEIGHT as isize / 2;
 
-            let wall_color = if side == 1 { 0x00FF0000 } else { 0x00AA0000 }; // Red or darker red
+            let wall_color = if side == 1 { 0x008A7755 } else { 0x00695A41 }; // lighter or darker
 
             for y in 0..HEIGHT {
                 if y as isize >= draw_start && y as isize <= draw_end {
@@ -202,7 +201,8 @@ fn main() {
         panic!("{}", e);
     });
 
-    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+    // Limit to 60 fps
+    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));    
 
     let mut game_state = GameState::new();
     let mut renderer = Renderer::new();
