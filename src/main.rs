@@ -3,6 +3,14 @@ use minifb::{Key, Window, WindowOptions};
 const WIDTH: usize = 640;
 const HEIGHT: usize = 480;
 
+struct Input {
+    up_pressed: bool,
+    down_pressed: bool,
+    left_pressed: bool,
+    right_pressed: bool,
+    left_alt_pressed: bool,
+}
+
 struct Player {
     x: f32,
     y: f32,
@@ -82,24 +90,51 @@ impl World {
 }
 
 struct GameState {
-    players: Vec<Player>,
+    player: Player,
     world: World,
 }
 
 impl GameState {
     fn new() -> Self {
         GameState {
-            players: vec![Player {
+            player: Player {
                 x: 1.5,
                 y: 1.5,
                 angle: std::f32::consts::PI / 2.0,
-            }],
+            },
             world: World::new(),
         }
     }
 
-    fn update(&mut self, _window: &Window) {
-        // Input is now handled by the `handle_input` function
+    fn update(&mut self, input: &Input) {
+        let move_speed = 0.075;
+        let strafe_speed = 0.05;
+        let rot_speed = 0.05;
+
+        if input.up_pressed {
+            self.player.move_forward(move_speed, &self.world);
+        }
+        if input.down_pressed {
+            self.player.move_backward(move_speed, &self.world);
+        }
+
+        if input.left_alt_pressed {
+            if input.left_pressed {
+                self.player.strafe_left(strafe_speed, &self.world);
+            }
+            if input.right_pressed {
+                self.player.strafe_right(strafe_speed, &self.world);
+            }
+        }
+
+        if !input.left_alt_pressed {
+            if input.left_pressed {
+                self.player.turn_left(rot_speed);
+            }
+            if input.right_pressed {
+                self.player.turn_right(rot_speed);
+            }
+        }
     }
 }
 
@@ -128,7 +163,7 @@ impl Renderer {
         }
 
         // Raycasting
-        let player = &game_state.players[0];
+        let player = &game_state.player;
         for x in 0..WIDTH {
             let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0; // x-coordinate in camera space
             let ray_dir_x =
@@ -206,37 +241,13 @@ impl Renderer {
     }
 }
 
-fn handle_input(window: &Window, game_state: &mut GameState) {
-    let move_speed = 0.075;
-    let strafe_speed = 0.05;
-    let rot_speed = 0.05;
-
-    // Assuming we are only controlling the first player for now
-    let player = &mut game_state.players[0];
-
-    if window.is_key_down(Key::Up) {
-        player.move_forward(move_speed, &game_state.world);
-    }
-    if window.is_key_down(Key::Down) {
-        player.move_backward(move_speed, &game_state.world);
-    }
-
-    if window.is_key_down(Key::LeftAlt) {
-        if window.is_key_down(Key::Left) {
-            player.strafe_left(strafe_speed, &game_state.world);
-        }
-        if window.is_key_down(Key::Right) {
-            player.strafe_right(strafe_speed, &game_state.world);
-        }
-    }
-
-    if !window.is_key_down(Key::LeftAlt) {
-        if window.is_key_down(Key::Left) {
-            player.turn_left(rot_speed);
-        }
-        if window.is_key_down(Key::Right) {
-            player.turn_right(rot_speed);
-        }
+fn handle_input(window: &Window) -> Input {
+    Input {
+        up_pressed: window.is_key_down(Key::Up),
+        down_pressed: window.is_key_down(Key::Down),
+        left_pressed: window.is_key_down(Key::Left),
+        right_pressed: window.is_key_down(Key::Right),
+        left_alt_pressed: window.is_key_down(Key::LeftAlt),
     }
 }
 
@@ -258,7 +269,8 @@ fn main() {
     let mut renderer = Renderer::new();
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        handle_input(&window, &mut game_state);
+        let input = handle_input(&window);
+        game_state.update(&input);
         renderer.render(&game_state);
 
         window
