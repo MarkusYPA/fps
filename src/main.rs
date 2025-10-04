@@ -1,7 +1,7 @@
 use minifb::{Key, Window, WindowOptions};
 
-const WIDTH: usize = 640;
-const HEIGHT: usize = 480;
+const WIDTH: usize = 800;
+const HEIGHT: usize = 600;
 
 struct Input {
     up_pressed: bool,
@@ -33,62 +33,39 @@ impl Player {
     }
 
     fn take_input(&mut self, input: &Input, world: &World) {
+        let mut new_x = self.x;
+        let mut new_y = self.y;
+
         if input.up_pressed {
-            self.move_forward(world);
+            new_x += self.angle.cos() * self.move_speed;
+            new_y += self.angle.sin() * self.move_speed;
         }
         if input.down_pressed {
-            self.move_backward(world);
+            new_x -= self.angle.cos() * self.move_speed;
+            new_y -= self.angle.sin() * self.move_speed;
         }
 
         if input.left_alt_pressed {
             if input.left_pressed {
-                self.strafe_left(world);
+                new_x -= self.angle.sin() * self.strafe_speed;
+                new_y -= self.angle.cos() * self.strafe_speed;
             }
             if input.right_pressed {
-                self.strafe_right(world);
+                new_x += self.angle.sin() * self.strafe_speed;
+                new_y += self.angle.cos() * self.strafe_speed;
             }
         }
+
+        self.check_collision_and_move(new_x, new_y, world);
 
         if !input.left_alt_pressed {
             if input.left_pressed {
-                self.turn_left();
+                self.angle -= self.rot_speed;
             }
             if input.right_pressed {
-                self.turn_right();
+                self.angle += self.rot_speed;
             }
         }
-    }
-
-    fn move_forward(&mut self, world: &World) {
-        let new_x = self.x + self.angle.cos() * self.move_speed;
-        let new_y = self.y + self.angle.sin() * self.move_speed;
-        self.check_collision_and_move(new_x, new_y, world);
-    }
-
-    fn move_backward(&mut self, world: &World) {
-        let new_x = self.x - self.angle.cos() * self.move_speed;
-        let new_y = self.y - self.angle.sin() * self.move_speed;
-        self.check_collision_and_move(new_x, new_y, world);
-    }
-
-    fn strafe_left(&mut self, world: &World) {
-        let new_x = self.x + self.angle.sin() * self.strafe_speed;
-        let new_y = self.y - self.angle.cos() * self.strafe_speed;
-        self.check_collision_and_move(new_x, new_y, world);
-    }
-
-    fn strafe_right(&mut self, world: &World) {
-        let new_x = self.x - self.angle.sin() * self.strafe_speed;
-        let new_y = self.y + self.angle.cos() * self.strafe_speed;
-        self.check_collision_and_move(new_x, new_y, world);
-    }
-
-    fn turn_left(&mut self) {
-        self.angle -= self.rot_speed;
-    }
-
-    fn turn_right(&mut self) {
-        self.angle += self.rot_speed;
     }
 
     fn check_collision_and_move(&mut self, new_x: f32, new_y: f32, world: &World) {
@@ -255,7 +232,7 @@ fn handle_input(window: &Window) -> Input {
         down_pressed: window.is_key_down(Key::Down),
         left_pressed: window.is_key_down(Key::Left),
         right_pressed: window.is_key_down(Key::Right),
-        left_alt_pressed: window.is_key_down(Key::LeftAlt),
+        left_alt_pressed: window.is_key_down(Key::LeftShift),
     }
 }
 
