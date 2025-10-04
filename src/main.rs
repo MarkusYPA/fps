@@ -34,15 +34,21 @@ impl Player {
         let mut new_x = self.x;
         let mut new_y = self.y;
 
-        // TODO: slow down movement when strafing and going backward or forward
+        // Slow down movement when strafing and going backward or forward
+        let mut slower = 1.0;
+        if input.left_alt_pressed && (input.left_pressed || input.right_pressed) && (input.up_pressed || input.down_pressed) {
+            slower = 0.707;
+        }
+
+        
 
         if input.up_pressed {
-            new_x += self.angle.cos() * self.move_speed;
-            new_y += self.angle.sin() * self.move_speed;
+            new_x += self.angle.cos() * self.move_speed * slower;
+            new_y += self.angle.sin() * self.move_speed * slower;
         }
         if input.down_pressed {
-            new_x -= self.angle.cos() * self.move_speed;
-            new_y -= self.angle.sin() * self.move_speed;
+            new_x -= self.angle.cos() * self.move_speed * slower;
+            new_y -= self.angle.sin() * self.move_speed * slower;
         }
 
         if input.left_alt_pressed {
@@ -50,12 +56,12 @@ impl Player {
             let strafe_y = self.angle.cos();
 
             if input.right_pressed {
-                new_x += strafe_x * self.move_speed;
-                new_y += strafe_y * self.move_speed;
+                new_x += strafe_x * self.move_speed * slower;
+                new_y += strafe_y * self.move_speed * slower;
             }
             if input.left_pressed {
-                new_x -= strafe_x * self.move_speed;
-                new_y -= strafe_y * self.move_speed;
+                new_x -= strafe_x * self.move_speed * slower;
+                new_y -= strafe_y * self.move_speed * slower;
             }
         }
 
