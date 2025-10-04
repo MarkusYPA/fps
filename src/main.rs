@@ -1,7 +1,7 @@
 use minifb::{Key, Window, WindowOptions};
 
-const WIDTH: usize = 800;
-const HEIGHT: usize = 600;
+const WIDTH: usize = 1024; // 1024  1280
+const HEIGHT: usize = 768; // 768   960
 
 struct Input {
     up_pressed: bool,
@@ -26,9 +26,9 @@ impl Player {
             x: 1.5,
             y: 1.5,
             angle: std::f32::consts::PI / 2.0,
-            move_speed: 0.075,
-            strafe_speed: 0.05,
-            rot_speed: 0.05,
+            move_speed: 0.04,
+            strafe_speed: 0.03,
+            rot_speed: 0.03,
         }
     }
 
@@ -46,13 +46,16 @@ impl Player {
         }
 
         if input.left_alt_pressed {
-            if input.left_pressed {
-                new_x -= self.angle.sin() * self.strafe_speed;
-                new_y -= self.angle.cos() * self.strafe_speed;
-            }
+            let strafe_x = -self.angle.sin();
+            let strafe_y = self.angle.cos();
+
             if input.right_pressed {
-                new_x += self.angle.sin() * self.strafe_speed;
-                new_y += self.angle.cos() * self.strafe_speed;
+                new_x += strafe_x * self.strafe_speed;
+                new_y += strafe_y * self.strafe_speed;
+            }
+            if input.left_pressed {
+                new_x -= strafe_x * self.strafe_speed;
+                new_y -= strafe_y * self.strafe_speed;
             }
         }
 
@@ -211,10 +214,8 @@ impl Renderer {
             }
 
             let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-
             let draw_start = -line_height / 2 + HEIGHT as isize / 2;
             let draw_end = line_height / 2 + HEIGHT as isize / 2;
-
             let wall_color = if side == 1 { 0x008A7755 } else { 0x00695A41 }; // lighter or darker
 
             for y in 0..HEIGHT {
@@ -247,8 +248,7 @@ fn main() {
         panic!("{}", e);
     });
 
-    // Limit to 60 fps
-    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
+    window.set_target_fps(60);
 
     let mut game_state = GameState::new();
     let mut renderer = Renderer::new();
