@@ -1,0 +1,19 @@
+  Stage 1: Basic Window and Game Loop
+   1. Set up a window: I'll use the minifb library to create a window for rendering.
+   2. Create a game loop: This will be a simple loop that keeps the window open and responsive.
+   3. Initial rendering: I will draw a solid color to the window to confirm it's working.
+
+  Stage 2: Player and World
+   1. Define `Player`: A struct to hold the player's position and viewing angle.
+   2. Define `World`: A simple 2D map to represent the level layout.
+   3. Player movement: Implement basic movement logic (forward, backward, turning).
+
+  Stage 3: 3D Rendering with Raycasting
+   1. Implement Raycasting: I'll write the core raycasting logic to calculate what the player sees.
+   2. Render Walls: Draw the walls on the screen based on the raycasting results.
+   3. Render Floor and Ceiling: Add a simple floor and ceiling.
+
+  Stage 4: Code Separation
+   1. `GameState` struct: Create a struct to hold all the game's state (player, world, etc.).
+   2. `Renderer` struct: Create a struct responsible only for drawing the GameState.
+   3. Refactor: Separate the game logic (updating state) from the rendering logic. This is key for future multiplayer and AI development.
