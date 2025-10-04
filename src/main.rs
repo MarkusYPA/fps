@@ -46,7 +46,11 @@ struct GameState {
 impl GameState {
     fn new() -> Self {
         GameState {
-            player: Player { x: 2.0, y: 2.0, angle: std::f32::consts::PI / 2.0 },
+            player: Player {
+                x: 2.0,
+                y: 2.0,
+                angle: std::f32::consts::PI / 2.0,
+            },
             world: World::new(),
         }
     }
@@ -55,14 +59,27 @@ impl GameState {
         let move_speed = 0.1;
         let rot_speed = 0.05;
 
+        let mut new_x = self.player.x;
+        let mut new_y = self.player.y;
+
         if window.is_key_down(Key::W) {
-            self.player.x += self.player.angle.cos() * move_speed;
-            self.player.y += self.player.angle.sin() * move_speed;
+            new_x += self.player.angle.cos() * move_speed;
+            new_y += self.player.angle.sin() * move_speed;
         }
         if window.is_key_down(Key::S) {
-            self.player.x -= self.player.angle.cos() * move_speed;
-            self.player.y -= self.player.angle.sin() * move_speed;
+            new_x -= self.player.angle.cos() * move_speed;
+            new_y -= self.player.angle.sin() * move_speed;
         }
+
+        // Collision detection for X-axis
+        if self.world.get_tile(new_x as usize, self.player.y as usize) == 0 {
+            self.player.x = new_x;
+        }
+        // Collision detection for Y-axis
+        if self.world.get_tile(self.player.x as usize, new_y as usize) == 0 {
+            self.player.y = new_y;
+        }
+
         if window.is_key_down(Key::A) {
             self.player.angle -= rot_speed;
         }
@@ -99,8 +116,10 @@ impl Renderer {
         // Raycasting
         for x in 0..WIDTH {
             let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0; // x-coordinate in camera space
-            let ray_dir_x = game_state.player.angle.cos() + 0.66 * camera_x * (-game_state.player.angle.sin());
-            let ray_dir_y = game_state.player.angle.sin() + 0.66 * camera_x * game_state.player.angle.cos();
+            let ray_dir_x =
+                game_state.player.angle.cos() + 0.66 * camera_x * (-game_state.player.angle.sin());
+            let ray_dir_y =
+                game_state.player.angle.sin() + 0.66 * camera_x * game_state.player.angle.cos();
 
             let mut map_x = game_state.player.x as usize;
             let mut map_y = game_state.player.y as usize;
@@ -149,9 +168,11 @@ impl Renderer {
 
             let perp_wall_dist;
             if side == 0 {
-                perp_wall_dist = (map_x as f32 - game_state.player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x;
+                perp_wall_dist =
+                    (map_x as f32 - game_state.player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x;
             } else {
-                perp_wall_dist = (map_y as f32 - game_state.player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y;
+                perp_wall_dist =
+                    (map_y as f32 - game_state.player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y;
             }
 
             let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
