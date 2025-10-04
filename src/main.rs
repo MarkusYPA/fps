@@ -16,7 +16,6 @@ struct Player {
     y: f32,
     angle: f32,
     move_speed: f32,
-    strafe_speed: f32,
     rot_speed: f32,
 }
 
@@ -26,8 +25,7 @@ impl Player {
             x: 1.5,
             y: 1.5,
             angle: std::f32::consts::PI / 2.0,
-            move_speed: 0.04,
-            strafe_speed: 0.03,
+            move_speed: 0.05,
             rot_speed: 0.03,
         }
     }
@@ -35,6 +33,8 @@ impl Player {
     fn take_input(&mut self, input: &Input, world: &World) {
         let mut new_x = self.x;
         let mut new_y = self.y;
+
+        // TODO: slow down movement when strafing and going backward or forward
 
         if input.up_pressed {
             new_x += self.angle.cos() * self.move_speed;
@@ -50,12 +50,12 @@ impl Player {
             let strafe_y = self.angle.cos();
 
             if input.right_pressed {
-                new_x += strafe_x * self.strafe_speed;
-                new_y += strafe_y * self.strafe_speed;
+                new_x += strafe_x * self.move_speed;
+                new_y += strafe_y * self.move_speed;
             }
             if input.left_pressed {
-                new_x -= strafe_x * self.strafe_speed;
-                new_y -= strafe_y * self.strafe_speed;
+                new_x -= strafe_x * self.move_speed;
+                new_y -= strafe_y * self.move_speed;
             }
         }
 
