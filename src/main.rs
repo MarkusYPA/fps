@@ -56,19 +56,33 @@ impl GameState {
     }
 
     fn update(&mut self, window: &Window) {
-        let move_speed = 0.1;
+        let move_speed = 0.075;
+        let strafe_speed = 0.05;
         let rot_speed = 0.05;
 
         let mut new_x = self.player.x;
         let mut new_y = self.player.y;
 
-        if window.is_key_down(Key::W) {
+        // Move back and forth
+        if window.is_key_down(Key::Up) {
             new_x += self.player.angle.cos() * move_speed;
             new_y += self.player.angle.sin() * move_speed;
         }
-        if window.is_key_down(Key::S) {
+        if window.is_key_down(Key::Down) {
             new_x -= self.player.angle.cos() * move_speed;
             new_y -= self.player.angle.sin() * move_speed;
+        }
+
+        // Strafe left and right
+        if window.is_key_down(Key::LeftAlt) {
+            if window.is_key_down(Key::Left) {
+                new_x += self.player.angle.sin() * strafe_speed;
+                new_y -= self.player.angle.cos() * strafe_speed;
+            }
+            if window.is_key_down(Key::Right) {
+                new_x -= self.player.angle.sin() * strafe_speed;
+                new_y += self.player.angle.cos() * strafe_speed;
+            }
         }
 
         // Collision detection
@@ -79,11 +93,14 @@ impl GameState {
             self.player.y = new_y;
         }
 
-        if window.is_key_down(Key::A) {
-            self.player.angle -= rot_speed;
-        }
-        if window.is_key_down(Key::D) {
-            self.player.angle += rot_speed;
+        // turn left and right
+        if !window.is_key_down(Key::LeftAlt) {
+            if window.is_key_down(Key::Left) {
+                self.player.angle -= rot_speed;
+            }
+            if window.is_key_down(Key::Right) {
+                self.player.angle += rot_speed;
+            }
         }
     }
 }
@@ -202,7 +219,7 @@ fn main() {
     });
 
     // Limit to 60 fps
-    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));    
+    window.limit_update_rate(Some(std::time::Duration::from_micros(16600)));
 
     let mut game_state = GameState::new();
     let mut renderer = Renderer::new();
