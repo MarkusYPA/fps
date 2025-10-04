@@ -15,39 +15,80 @@ struct Player {
     x: f32,
     y: f32,
     angle: f32,
+    move_speed: f32,
+    strafe_speed: f32,
+    rot_speed: f32,
 }
 
 impl Player {
-    fn move_forward(&mut self, speed: f32, world: &World) {
-        let new_x = self.x + self.angle.cos() * speed;
-        let new_y = self.y + self.angle.sin() * speed;
+    fn new() -> Self {
+        Player {
+            x: 1.5,
+            y: 1.5,
+            angle: std::f32::consts::PI / 2.0,
+            move_speed: 0.075,
+            strafe_speed: 0.05,
+            rot_speed: 0.05,
+        }
+    }
+
+    fn take_input(&mut self, input: &Input, world: &World) {
+        if input.up_pressed {
+            self.move_forward(world);
+        }
+        if input.down_pressed {
+            self.move_backward(world);
+        }
+
+        if input.left_alt_pressed {
+            if input.left_pressed {
+                self.strafe_left(world);
+            }
+            if input.right_pressed {
+                self.strafe_right(world);
+            }
+        }
+
+        if !input.left_alt_pressed {
+            if input.left_pressed {
+                self.turn_left();
+            }
+            if input.right_pressed {
+                self.turn_right();
+            }
+        }
+    }
+
+    fn move_forward(&mut self, world: &World) {
+        let new_x = self.x + self.angle.cos() * self.move_speed;
+        let new_y = self.y + self.angle.sin() * self.move_speed;
         self.check_collision_and_move(new_x, new_y, world);
     }
 
-    fn move_backward(&mut self, speed: f32, world: &World) {
-        let new_x = self.x - self.angle.cos() * speed;
-        let new_y = self.y - self.angle.sin() * speed;
+    fn move_backward(&mut self, world: &World) {
+        let new_x = self.x - self.angle.cos() * self.move_speed;
+        let new_y = self.y - self.angle.sin() * self.move_speed;
         self.check_collision_and_move(new_x, new_y, world);
     }
 
-    fn strafe_left(&mut self, speed: f32, world: &World) {
-        let new_x = self.x + self.angle.sin() * speed;
-        let new_y = self.y - self.angle.cos() * speed;
+    fn strafe_left(&mut self, world: &World) {
+        let new_x = self.x + self.angle.sin() * self.strafe_speed;
+        let new_y = self.y - self.angle.cos() * self.strafe_speed;
         self.check_collision_and_move(new_x, new_y, world);
     }
 
-    fn strafe_right(&mut self, speed: f32, world: &World) {
-        let new_x = self.x - self.angle.sin() * speed;
-        let new_y = self.y + self.angle.cos() * speed;
+    fn strafe_right(&mut self, world: &World) {
+        let new_x = self.x - self.angle.sin() * self.strafe_speed;
+        let new_y = self.y + self.angle.cos() * self.strafe_speed;
         self.check_collision_and_move(new_x, new_y, world);
     }
 
-    fn turn_left(&mut self, speed: f32) {
-        self.angle -= speed;
+    fn turn_left(&mut self) {
+        self.angle -= self.rot_speed;
     }
 
-    fn turn_right(&mut self, speed: f32) {
-        self.angle += speed;
+    fn turn_right(&mut self) {
+        self.angle += self.rot_speed;
     }
 
     fn check_collision_and_move(&mut self, new_x: f32, new_y: f32, world: &World) {
@@ -97,44 +138,13 @@ struct GameState {
 impl GameState {
     fn new() -> Self {
         GameState {
-            player: Player {
-                x: 1.5,
-                y: 1.5,
-                angle: std::f32::consts::PI / 2.0,
-            },
+            player: Player::new(),
             world: World::new(),
         }
     }
 
     fn update(&mut self, input: &Input) {
-        let move_speed = 0.075;
-        let strafe_speed = 0.05;
-        let rot_speed = 0.05;
-
-        if input.up_pressed {
-            self.player.move_forward(move_speed, &self.world);
-        }
-        if input.down_pressed {
-            self.player.move_backward(move_speed, &self.world);
-        }
-
-        if input.left_alt_pressed {
-            if input.left_pressed {
-                self.player.strafe_left(strafe_speed, &self.world);
-            }
-            if input.right_pressed {
-                self.player.strafe_right(strafe_speed, &self.world);
-            }
-        }
-
-        if !input.left_alt_pressed {
-            if input.left_pressed {
-                self.player.turn_left(rot_speed);
-            }
-            if input.right_pressed {
-                self.player.turn_right(rot_speed);
-            }
-        }
+        self.player.take_input(input, &self.world);
     }
 }
 
@@ -166,10 +176,8 @@ impl Renderer {
         let player = &game_state.player;
         for x in 0..WIDTH {
             let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0; // x-coordinate in camera space
-            let ray_dir_x =
-                player.angle.cos() + 0.66 * camera_x * (-player.angle.sin()); // 0.66 is the camera field of view?
-            let ray_dir_y =
-                player.angle.sin() + 0.66 * camera_x * player.angle.cos();
+            let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin()); // 0.66 is the camera field of view?
+            let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
 
             let mut map_x = player.x as usize;
             let mut map_y = player.y as usize;
