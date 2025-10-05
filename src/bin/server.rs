@@ -1,11 +1,11 @@
 use std::net::UdpSocket;
-use fps::{GameState, Input};
+use fps::{GameState, Input, PORT};
 use local_ip_address::local_ip;
 
 fn main() -> std::io::Result<()> {
     let my_local_ip = local_ip().unwrap();
-    let socket = UdpSocket::bind(format!("{}:8080", my_local_ip))?;
-    println!("Server started at {}:8080", my_local_ip);
+    let socket = UdpSocket::bind(format!("{}:{}", my_local_ip, PORT))?;
+    println!("Server started at {}:{}", my_local_ip, PORT);
 
     let mut game_state = GameState::new();
     let mut clients = std::collections::HashSet::new();

@@ -1,9 +1,10 @@
 use minifb::{Key, Window, WindowOptions};
 use std::io;
+use std::net::ToSocketAddrs;
 use std::net::UdpSocket;
 use std::time::{Duration, Instant};
 
-use fps::{GameState, HEIGHT, Input, WIDTH};
+use fps::{GameState, HEIGHT, Input, PORT, WIDTH};
 
 struct Renderer {
     buffer: Vec<u32>,
@@ -120,7 +121,8 @@ fn main() -> io::Result<()> {
     println!("Enter server IP address:");
     let mut server_ip = String::new();
     io::stdin().read_line(&mut server_ip)?;
-    let server_address = format!("{}:8080", server_ip.trim());
+    let ip_only = server_ip.trim().rsplitn(2, ':').last().unwrap().trim();
+    let server_address = format!("{}:{}", ip_only, PORT);
 
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.connect(server_address)?;
