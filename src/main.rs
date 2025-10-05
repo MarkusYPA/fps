@@ -1,4 +1,6 @@
 use minifb::{Key, Window, WindowOptions};
+use rayon::prelude::*;
+use std::time::{Duration, Instant};
 
 const WIDTH: usize = 1024; // 1024  1280
 const HEIGHT: usize = 768; // 768   960
@@ -36,10 +38,7 @@ impl Player {
 
         // Slow down movement when strafing and going backward or forward
         let mut slower = 1.0;
-        if input.strafe
-            && (input.left || input.right)
-            && (input.forth || input.back)
-        {
+        if input.strafe && (input.left || input.right) && (input.forth || input.back) {
             slower = 0.707;
         }
 
@@ -160,88 +159,89 @@ impl Renderer {
             }
         }
 
-        // Raycasting per column
         let player = &game_state.player;
-        for x in 0..WIDTH {
-            // Map screen x coordinate to camera space (-1.0 left .. 1.0 right)
-            let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
 
-            // Ray direction for this column: Offset forward vector by camera_x.
-            // The 0.66 is basically half the FOV scaling factor.
-            let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
-            let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
+        // Raycasting per column
+        // Compute all wall columns in parallel, store them in a temporary Vec
+        let columns: Vec<(usize, Vec<u32>)> = (0..WIDTH)
+            .into_par_iter()
+            .map(|x| {
+                let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
+                let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
+                let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
 
-            // Current square of the map the ray starts in
-            let mut map_x = player.x as usize;
-            let mut map_y = player.y as usize;
+                let mut map_x = player.x as usize;
+                let mut map_y = player.y as usize;
 
-            // Length of ray from one x- or y-wall to the next
-            let delta_dist_x = (1.0 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
-            let delta_dist_y = (1.0 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
+                let delta_dist_x = (1.0 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
+                let delta_dist_y = (1.0 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
 
-            // Step direction (+1 or -1), and distance to first wall
-            let step_x;
-            let step_y;
-            let mut wall_dist_x;
-            let mut wall_dist_y;
+                let step_x;
+                let step_y;
+                let mut side_dist_x;
+                let mut side_dist_y;
 
-            // Figure out step and initial wall distances
-            if ray_dir_x < 0.0 {
-                step_x = -1;
-                wall_dist_x = (player.x - map_x as f32) * delta_dist_x;
-            } else {
-                step_x = 1;
-                wall_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
-            }
-            if ray_dir_y < 0.0 {
-                step_y = -1;
-                wall_dist_y = (player.y - map_y as f32) * delta_dist_y;
-            } else {
-                step_y = 1;
-                wall_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
-            }
-
-            // Perform DDA (Digital Differential Analyzer) until wall is hit
-            let mut hit = false;
-            let mut wall_type = 0; // 0 = hit nort-south wall , 1 = hit east-west wall
-            while !hit {
-                if wall_dist_x < wall_dist_y {
-                    wall_dist_x += delta_dist_x;
-                    map_x = (map_x as isize + step_x) as usize;
-                    wall_type = 0;
+                if ray_dir_x < 0.0 {
+                    step_x = -1;
+                    side_dist_x = (player.x - map_x as f32) * delta_dist_x;
                 } else {
-                    wall_dist_y += delta_dist_y;
-                    map_y = (map_y as isize + step_y) as usize;
-                    wall_type = 1;
+                    step_x = 1;
+                    side_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
+                }
+                if ray_dir_y < 0.0 {
+                    step_y = -1;
+                    side_dist_y = (player.y - map_y as f32) * delta_dist_y;
+                } else {
+                    step_y = 1;
+                    side_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
                 }
 
-                if game_state.world.get_tile(map_x, map_y) == 1 {
-                    hit = true;
+                let mut hit = false;
+                let mut side = 0;
+                while !hit {
+                    if side_dist_x < side_dist_y {
+                        side_dist_x += delta_dist_x;
+                        map_x = (map_x as isize + step_x) as usize;
+                        side = 0;
+                    } else {
+                        side_dist_y += delta_dist_y;
+                        map_y = (map_y as isize + step_y) as usize;
+                        side = 1;
+                    }
+
+                    if game_state.world.get_tile(map_x, map_y) == 1 {
+                        hit = true;
+                    }
                 }
-            }
 
-            // Distance to wall (perpendicular to avoid fisheye effect)
-            let perp_wall_dist;
-            if wall_type == 0 {
-                perp_wall_dist =
-                    (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x;
-            } else {
-                perp_wall_dist =
-                    (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y;
-            }
+                let perp_wall_dist = if side == 0 {
+                    (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x
+                } else {
+                    (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y
+                };
 
-            // Wall height and corresponding line
-            let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-            let draw_start = -line_height / 2 + HEIGHT as isize / 2;
-            let draw_end = line_height / 2 + HEIGHT as isize / 2;
+                let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
+                let draw_start = -line_height / 2 + HEIGHT as isize / 2;
+                let draw_end = line_height / 2 + HEIGHT as isize / 2;
+                let wall_color = if side == 1 { 0x008A7755 } else { 0x00695A41 };
 
-            // Wall darkness from its orientation
-            let wall_color = if wall_type == 1 { 0x008A7755 } else { 0x00695A41 };
+                // Build this column as a Vec<u32>
+                let mut col = vec![0; HEIGHT];
+                for y in 0..HEIGHT {
+                    if y as isize >= draw_start && y as isize <= draw_end {
+                        col[y] = wall_color;
+                    }
+                }
 
-            // Wall slice into buffer
+                (x, col)
+            })
+            .collect();
+
+        // Copy results back into main buffer
+        for (x, col) in columns {
             for y in 0..HEIGHT {
-                if y as isize >= draw_start && y as isize <= draw_end {
-                    self.buffer[y * WIDTH + x] = wall_color;
+                if col[y] != 0 {
+                    self.buffer[y * WIDTH + x] = col[y];
                 }
             }
         }
@@ -269,10 +269,15 @@ fn main() {
         panic!("{}", e);
     });
 
-    window.set_target_fps(60);
+    //window.set_target_fps(60);
 
     let mut game_state = GameState::new();
     let mut renderer = Renderer::new();
+
+    // Timing setup
+    let mut frame_count = 0;
+    let mut fps_timer = Instant::now();
+    let mut fps: i32;
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let input = handle_input(&window);
@@ -282,5 +287,15 @@ fn main() {
         window
             .update_with_buffer(&renderer.buffer, WIDTH, HEIGHT)
             .unwrap();
+
+        // --- FPS calculation ---
+        frame_count += 1;
+        if fps_timer.elapsed() >= Duration::from_secs(1) {
+            fps = frame_count;
+            frame_count = 0;
+            fps_timer = Instant::now();
+
+            window.set_title(&format!("FPS Game - {} FPS", fps));
+        }
     }
 }
