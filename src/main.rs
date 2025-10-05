@@ -164,7 +164,8 @@ impl Renderer {
         // Raycasting per column
         // For each column x, compute (draw_start, draw_end, wall_color)
         let column_info: Vec<(isize, isize, u32)> = (0..WIDTH)
-            .into_par_iter()
+            //.into_par_iter()  // parallelizing here doesn't affect performance
+            .into_iter()
             .map(|x| {
                 let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
                 let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
@@ -225,19 +226,11 @@ impl Renderer {
                 let draw_end = line_height / 2 + HEIGHT as isize / 2;
                 let wall_color = if side == 1 { 0x008A7755 } else { 0x00695A41 };
 
-                // Build this column as a Vec<u32>
-                /* let mut col = vec![0; HEIGHT];
-                for y in 0..HEIGHT {
-                    if y as isize >= draw_start && y as isize <= draw_end {
-                        col[y] = wall_color;
-                    }
-                } */
-
                 (draw_start, draw_end, wall_color)
             })
             .collect();
 
-        // --- Now fill buffer in parallel per row ---
+        // Fill buffer in parallel per row
         self.buffer
             .par_chunks_mut(WIDTH) // each row as &mut [u32]
             .enumerate()
@@ -273,7 +266,7 @@ fn main() {
         panic!("{}", e);
     });
 
-    //window.set_target_fps(60);
+    window.set_target_fps(60);
 
     let mut game_state = GameState::new();
     let mut renderer = Renderer::new();
