@@ -4,11 +4,11 @@ const WIDTH: usize = 1024; // 1024  1280
 const HEIGHT: usize = 768; // 768   960
 
 struct Input {
-    up_pressed: bool,
-    down_pressed: bool,
-    left_pressed: bool,
-    right_pressed: bool,
-    left_alt_pressed: bool,
+    forth: bool,
+    back: bool,
+    left: bool,
+    right: bool,
+    strafe: bool,
 }
 
 struct Player {
@@ -36,32 +36,32 @@ impl Player {
 
         // Slow down movement when strafing and going backward or forward
         let mut slower = 1.0;
-        if input.left_alt_pressed
-            && (input.left_pressed || input.right_pressed)
-            && (input.up_pressed || input.down_pressed)
+        if input.strafe
+            && (input.left || input.right)
+            && (input.forth || input.back)
         {
             slower = 0.707;
         }
 
-        if input.up_pressed {
+        if input.forth {
             new_x += self.angle.cos() * self.move_speed * slower;
             new_y += self.angle.sin() * self.move_speed * slower;
         }
 
-        if input.down_pressed {
+        if input.back {
             new_x -= self.angle.cos() * self.move_speed * slower;
             new_y -= self.angle.sin() * self.move_speed * slower;
         }
 
-        if input.left_alt_pressed {
+        if input.strafe {
             let strafe_x = -self.angle.sin();
             let strafe_y = self.angle.cos();
 
-            if input.right_pressed {
+            if input.right {
                 new_x += strafe_x * self.move_speed * slower;
                 new_y += strafe_y * self.move_speed * slower;
             }
-            if input.left_pressed {
+            if input.left {
                 new_x -= strafe_x * self.move_speed * slower;
                 new_y -= strafe_y * self.move_speed * slower;
             }
@@ -69,11 +69,11 @@ impl Player {
 
         self.check_collision_and_move(new_x, new_y, world);
 
-        if !input.left_alt_pressed {
-            if input.left_pressed {
+        if !input.strafe {
+            if input.left {
                 self.angle -= self.rot_speed;
             }
-            if input.right_pressed {
+            if input.right {
                 self.angle += self.rot_speed;
             }
         }
@@ -250,11 +250,11 @@ impl Renderer {
 
 fn handle_input(window: &Window) -> Input {
     Input {
-        up_pressed: window.is_key_down(Key::Up),
-        down_pressed: window.is_key_down(Key::Down),
-        left_pressed: window.is_key_down(Key::Left),
-        right_pressed: window.is_key_down(Key::Right),
-        left_alt_pressed: window.is_key_down(Key::LeftShift),
+        forth: window.is_key_down(Key::Up),
+        back: window.is_key_down(Key::Down),
+        left: window.is_key_down(Key::Left),
+        right: window.is_key_down(Key::Right),
+        strafe: window.is_key_down(Key::LeftAlt) || window.is_key_down(Key::LeftShift),
     }
 }
 
