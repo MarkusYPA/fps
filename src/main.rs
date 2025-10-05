@@ -162,8 +162,8 @@ impl Renderer {
         let player = &game_state.player;
 
         // Raycasting per column
-        // Compute all wall columns in parallel, store them in a temporary Vec
-        let columns: Vec<(usize, Vec<u32>)> = (0..WIDTH)
+        // For each column x, compute (draw_start, draw_end, wall_color)
+        let column_info: Vec<(isize, isize, u32)> = (0..WIDTH)
             .into_par_iter()
             .map(|x| {
                 let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
@@ -226,25 +226,29 @@ impl Renderer {
                 let wall_color = if side == 1 { 0x008A7755 } else { 0x00695A41 };
 
                 // Build this column as a Vec<u32>
-                let mut col = vec![0; HEIGHT];
+                /* let mut col = vec![0; HEIGHT];
                 for y in 0..HEIGHT {
                     if y as isize >= draw_start && y as isize <= draw_end {
                         col[y] = wall_color;
                     }
-                }
+                } */
 
-                (x, col)
+                (draw_start, draw_end, wall_color)
             })
             .collect();
 
-        // Copy results back into main buffer
-        for (x, col) in columns {
-            for y in 0..HEIGHT {
-                if col[y] != 0 {
-                    self.buffer[y * WIDTH + x] = col[y];
+        // --- Now fill buffer in parallel per row ---
+        self.buffer
+            .par_chunks_mut(WIDTH) // each row as &mut [u32]
+            .enumerate()
+            .for_each(|(y, row)| {
+                let y = y as isize;
+                for (x, &(draw_start, draw_end, wall_color)) in column_info.iter().enumerate() {
+                    if y >= draw_start && y <= draw_end {
+                        row[x] = wall_color;
+                    }
                 }
-            }
-        }
+            });
     }
 }
 
