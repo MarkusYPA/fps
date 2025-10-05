@@ -1,4 +1,5 @@
 use minifb::{Key, Window, WindowOptions};
+use std::time::{Duration, Instant};
 
 const WIDTH: usize = 1024; // 1024  1280
 const HEIGHT: usize = 768; // 768   960
@@ -274,6 +275,11 @@ fn main() {
     let mut game_state = GameState::new();
     let mut renderer = Renderer::new();
 
+    // Timing setup
+    let mut frame_count = 0;
+    let mut fps_timer = Instant::now();
+    let mut fps: i32;
+
     while window.is_open() && !window.is_key_down(Key::Escape) {
         let input = handle_input(&window);
         game_state.update(&input);
@@ -282,5 +288,15 @@ fn main() {
         window
             .update_with_buffer(&renderer.buffer, WIDTH, HEIGHT)
             .unwrap();
+
+        // --- FPS calculation ---
+        frame_count += 1;
+        if fps_timer.elapsed() >= Duration::from_secs(1) {
+            fps = frame_count;
+            frame_count = 0;
+            fps_timer = Instant::now();
+
+            window.set_title(&format!("FPS Game - {} FPS", fps));
+        }
     }
 }
