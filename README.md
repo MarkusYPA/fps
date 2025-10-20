@@ -36,6 +36,13 @@ The game window will open, and you can start playing. The client captures your k
 
 ## Controls
 
+
+#### Modern way
+-   **WASD keys:** Move forward, backward, left and right
+-   **Mouse:** Look left and right
+-   **Escape:** Exit the game
+
+#### Retro style
 -   **Up Arrow:** Move forward
 -   **Down Arrow:** Move backward
 -   **Left Arrow:** Rotate left
