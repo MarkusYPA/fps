@@ -1,6 +1,6 @@
-use std::net::UdpSocket;
 use fps::{GameState, Input, PORT};
 use local_ip_address::local_ip;
+use std::net::UdpSocket;
 
 fn main() -> std::io::Result<()> {
     let my_local_ip = local_ip().unwrap();

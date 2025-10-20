@@ -6,13 +6,15 @@ use std::time::{Duration, Instant};
 
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::LogicalSize;
-use winit::event::{Event, WindowEvent};
+use winit::event::{DeviceEvent, Event, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
 use fps::{GameState, HEIGHT, Input, PORT, WIDTH};
+
+const MOUSE_SPEED: f32 = 0.06;
 
 struct Renderer {
     buffer: Vec<u32>,
@@ -142,6 +144,12 @@ fn main() -> Result<()> {
             .build(&event_loop)?
     });
 
+    window.set_cursor_visible(false);
+    window
+        .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+        .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
+        .unwrap();
+
     let mut pixels = {
         let window_size = window.inner_size();
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &*window);
@@ -154,10 +162,17 @@ fn main() -> Result<()> {
     let mut frame_count = 0;
     let mut fps_timer = Instant::now();
     let window_clone = window.clone();
+    let mut mouse_dx = 0.0;
 
     Ok(event_loop.run(move |event, elwt| {
-        if let Event::WindowEvent { ref event, .. } = event {
-            match event {
+        match &event {
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion { delta },
+                ..
+            } => {
+                mouse_dx = delta.0 as f32;
+            }
+            Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
                     elwt.exit();
                     return;
@@ -182,7 +197,8 @@ fn main() -> Result<()> {
                     }
                 }
                 _ => (),
-            }
+            },
+            _ => (),
         }
 
         if input.update(&event) {
@@ -191,13 +207,22 @@ fn main() -> Result<()> {
                 return;
             }
 
+            let mut turn = mouse_dx * MOUSE_SPEED;
+            if input.key_held(KeyCode::ArrowLeft) {
+                turn -= 1.0;
+            }
+            if input.key_held(KeyCode::ArrowRight) {
+                turn += 1.0;
+            }
+
             let client_input = Input {
                 forth: input.key_held(KeyCode::ArrowUp) || input.key_held(KeyCode::KeyW),
                 back: input.key_held(KeyCode::ArrowDown) || input.key_held(KeyCode::KeyS),
-                left: input.key_held(KeyCode::ArrowLeft) || input.key_held(KeyCode::KeyA),
-                right: input.key_held(KeyCode::ArrowRight) || input.key_held(KeyCode::KeyD),
-                strafe: input.key_held(KeyCode::AltLeft) || input.key_held(KeyCode::ShiftLeft),
+                left: input.key_held(KeyCode::KeyA),
+                right: input.key_held(KeyCode::KeyD),
+                turn,
             };
+            mouse_dx = 0.0;
 
             let encoded_input = bincode::serialize(&client_input).unwrap();
             if let Err(e) = socket.send(&encoded_input) {
