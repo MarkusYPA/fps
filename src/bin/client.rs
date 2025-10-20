@@ -45,10 +45,13 @@ impl Renderer {
                 let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
                 let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
                 let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
+
                 let mut map_x = player.x as usize;
                 let mut map_y = player.y as usize;
+
                 let delta_dist_x = (1.0f32 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
                 let delta_dist_y = (1.0f32 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
+
                 let step_x;
                 let step_y;
                 let mut wall_dist_x;
@@ -130,10 +133,12 @@ fn main() -> Result<()> {
     let server_address = format!("{}:{}", ip_only, PORT);
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.connect(server_address)?;
+
     let connect_message = ClientMessage::Connect;
     let encoded_connect_message = bincode::serialize(&connect_message).unwrap();
     socket.send(&encoded_connect_message)?;
     socket.set_nonblocking(true)?;
+
     let mut buf = [0; 1024];
     let mut my_id: Option<u64> = None;
 
@@ -160,9 +165,10 @@ fn main() -> Result<()> {
         }
     }
 
-    let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
+    let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;    
     let event_loop = EventLoop::new()?;
     let mut input = WinitInputHelper::new();
+
     let window = Arc::new({
         let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
         WindowBuilder::new()
@@ -186,6 +192,7 @@ fn main() -> Result<()> {
 
     let mut renderer = Renderer::new();
     let mut game_state: Option<GameState> = None;
+
     let mut frame_count = 0;
     let mut fps_timer = Instant::now();
     let window_clone = window.clone();
@@ -237,11 +244,9 @@ fn main() -> Result<()> {
             }
 
             let mut turn = mouse_dx * MOUSE_SPEED;
-
             if input.key_held(KeyCode::ArrowLeft) {
                 turn -= 1.0;
             }
-
             if input.key_held(KeyCode::ArrowRight) {
                 turn += 1.0;
             }
@@ -253,14 +258,13 @@ fn main() -> Result<()> {
                 right: input.key_held(KeyCode::KeyD),
                 turn,
             };
-
             mouse_dx = 0.0;
 
             let encoded_input = bincode::serialize(&ClientMessage::Input(client_input)).unwrap();
-
             if let Err(e) = socket.send(&encoded_input) {
                 eprintln!("Error sending data: {}", e);
             }
+
             window_clone.request_redraw();
         }
 
@@ -274,11 +278,9 @@ fn main() -> Result<()> {
                         latest_game_state = Some(decoded_state);
                     }
                 }
-
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     break;
                 }
-
                 Err(e) => {
                     eprintln!("Error receiving data: {}", e);
                     break;

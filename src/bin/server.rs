@@ -1,4 +1,4 @@
-use fps::{ClientMessage, GameState, Player, Welcome, PORT};
+use fps::{ClientMessage, GameState, PORT, Player, Welcome};
 use local_ip_address::local_ip;
 use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
