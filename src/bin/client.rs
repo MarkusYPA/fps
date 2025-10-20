@@ -14,6 +14,8 @@ use winit_input_helper::WinitInputHelper;
 
 use fps::{ClientMessage, GameState, HEIGHT, Input, PORT, WIDTH, Welcome};
 
+use rayon::prelude::*;
+
 const MOUSE_SPEED: f32 = 0.06;
 
 struct Renderer {
@@ -31,86 +33,98 @@ impl Renderer {
         // Clear the buffer with ceiling and floor colors
         for y in 0..HEIGHT / 2 {
             for x in 0..WIDTH {
-                self.buffer[y * WIDTH + x] = 0x00AACCFF; // Ceiling
+                self.buffer[y * WIDTH + x] = 0x00AACCFFu32; // Ceiling
             }
         }
         for y in HEIGHT / 2..HEIGHT {
             for x in 0..WIDTH {
-                self.buffer[y * WIDTH + x] = 0x00555555; // Floor
+                self.buffer[y * WIDTH + x] = 0x00555555u32; // Floor
             }
         }
 
         if let Some(player) = game_state.players.get(&my_id.to_string()) {
-            for x in 0..WIDTH {
-                let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
-                let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
-                let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
+            let columns: Vec<(usize, Vec<(usize, u32)>)> = (0..WIDTH)
+                .into_par_iter()
+                .map(|x| {
+                    let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
+                    let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
+                    let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
 
-                let mut map_x = player.x as usize;
-                let mut map_y = player.y as usize;
+                    let mut map_x = player.x as usize;
+                    let mut map_y = player.y as usize;
 
-                let delta_dist_x = (1.0f32 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
-                let delta_dist_y = (1.0f32 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
+                    let delta_dist_x = (1.0f32 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
+                    let delta_dist_y = (1.0f32 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
 
-                let step_x;
-                let step_y;
-                let mut wall_dist_x;
-                let mut wall_dist_y;
+                    let step_x;
+                    let step_y;
+                    let mut wall_dist_x;
+                    let mut wall_dist_y;
 
-                if ray_dir_x < 0.0 {
-                    step_x = -1;
-                    wall_dist_x = (player.x - map_x as f32) * delta_dist_x;
-                } else {
-                    step_x = 1;
-                    wall_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
-                }
-
-                if ray_dir_y < 0.0 {
-                    step_y = -1;
-                    wall_dist_y = (player.y - map_y as f32) * delta_dist_y;
-                } else {
-                    step_y = 1;
-                    wall_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
-                }
-
-                let mut hit = false;
-                let mut wall_type = 0;
-
-                while !hit {
-                    if wall_dist_x < wall_dist_y {
-                        wall_dist_x += delta_dist_x;
-                        map_x = (map_x as isize + step_x) as usize;
-                        wall_type = 0;
+                    if ray_dir_x < 0.0 {
+                        step_x = -1;
+                        wall_dist_x = (player.x - map_x as f32) * delta_dist_x;
                     } else {
-                        wall_dist_y += delta_dist_y;
-                        map_y = (map_y as isize + step_y) as usize;
-                        wall_type = 1;
+                        step_x = 1;
+                        wall_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
                     }
 
-                    if game_state.world.get_tile(map_x, map_y) == 1 {
-                        hit = true;
+                    if ray_dir_y < 0.0 {
+                        step_y = -1;
+                        wall_dist_y = (player.y - map_y as f32) * delta_dist_y;
+                    } else {
+                        step_y = 1;
+                        wall_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
                     }
-                }
 
-                let perp_wall_dist = if wall_type == 0 {
-                    (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x
-                } else {
-                    (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y
-                };
+                    let mut hit = false;
+                    let mut wall_type = 0;
 
-                let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-                let draw_start = (-line_height / 2 + HEIGHT as isize / 2).max(0) as usize;
-                let draw_end =
-                    (line_height / 2 + HEIGHT as isize / 2).min(HEIGHT as isize - 1) as usize;
+                    while !hit {
+                        if wall_dist_x < wall_dist_y {
+                            wall_dist_x += delta_dist_x;
+                            map_x = (map_x as isize + step_x) as usize;
+                            wall_type = 0;
+                        } else {
+                            wall_dist_y += delta_dist_y;
+                            map_y = (map_y as isize + step_y) as usize;
+                            wall_type = 1;
+                        }
 
-                let wall_color = if wall_type == 1 {
-                    0x008A7755
-                } else {
-                    0x00695A41
-                };
+                        if game_state.world.get_tile(map_x, map_y) == 1 {
+                            hit = true;
+                        }
+                    }
 
-                for y in draw_start..draw_end {
-                    self.buffer[y * WIDTH + x] = wall_color;
+                    let perp_wall_dist = if wall_type == 0 {
+                        (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x
+                    } else {
+                        (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y
+                    };
+
+                    let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
+                    let draw_start = (-line_height / 2 + HEIGHT as isize / 2).max(0) as usize;
+                    let draw_end =
+                        (line_height / 2 + HEIGHT as isize / 2).min(HEIGHT as isize - 1) as usize;
+
+                    let wall_color = if wall_type == 1 {
+                        0x008A7755
+                    } else {
+                        0x00695A41
+                    };
+
+                    let mut this_col: Vec<(usize, u32)> = Vec::new();
+                    for y in draw_start..draw_end {
+                        this_col.push((y, wall_color));
+                    }
+
+                    (x, this_col)
+                })
+                .collect();
+
+            for (x, col) in columns {
+                for (y, color) in col.into_iter() {
+                    self.buffer[y * WIDTH + x] = color;
                 }
             }
         }
@@ -165,7 +179,7 @@ fn main() -> Result<()> {
         }
     }
 
-    let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;    
+    let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
     let event_loop = EventLoop::new()?;
     let mut input = WinitInputHelper::new();
 
