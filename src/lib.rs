@@ -5,6 +5,17 @@ pub const HEIGHT: usize = 768;
 pub const PORT: u16 = 8080;
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum ClientMessage {
+    Connect,
+    Input(Input),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Welcome {
+    pub id: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Input {
     pub forth: bool,
     pub back: bool,
@@ -109,21 +120,25 @@ impl World {
     }
 }
 
+use std::collections::HashMap;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GameState {
-    pub player: Player,
+    pub players: HashMap<String, Player>,
     pub world: World,
 }
 
 impl GameState {
     pub fn new() -> Self {
         GameState {
-            player: Player::new(),
+            players: HashMap::new(),
             world: World::new(),
         }
     }
 
-    pub fn update(&mut self, input: &Input) {
-        self.player.take_input(input, &self.world);
+    pub fn update(&mut self, id: String, input: &Input) {
+        if let Some(player) = self.players.get_mut(&id) {
+            player.take_input(input, &self.world);
+        }
     }
 }

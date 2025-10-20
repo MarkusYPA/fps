@@ -12,7 +12,7 @@ use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-use fps::{GameState, HEIGHT, Input, PORT, WIDTH};
+use fps::{ClientMessage, GameState, HEIGHT, Input, PORT, WIDTH, Welcome};
 
 const MOUSE_SPEED: f32 = 0.06;
 
@@ -27,7 +27,7 @@ impl Renderer {
         }
     }
 
-    fn render(&mut self, game_state: &GameState) {
+    fn render(&mut self, game_state: &GameState, my_id: u64) {
         // Clear the buffer with ceiling and floor colors
         for y in 0..HEIGHT / 2 {
             for x in 0..WIDTH {
@@ -40,75 +40,75 @@ impl Renderer {
             }
         }
 
-        let player = &game_state.player;
-        for x in 0..WIDTH {
-            let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
-            let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
-            let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
+        if let Some(player) = game_state.players.get(&my_id.to_string()) {
+            for x in 0..WIDTH {
+                let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
+                let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
+                let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
+                let mut map_x = player.x as usize;
+                let mut map_y = player.y as usize;
+                let delta_dist_x = (1.0f32 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
+                let delta_dist_y = (1.0f32 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
+                let step_x;
+                let step_y;
+                let mut wall_dist_x;
+                let mut wall_dist_y;
 
-            let mut map_x = player.x as usize;
-            let mut map_y = player.y as usize;
-
-            let delta_dist_x = (1.0 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
-            let delta_dist_y = (1.0 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
-
-            let step_x;
-            let step_y;
-            let mut wall_dist_x;
-            let mut wall_dist_y;
-
-            if ray_dir_x < 0.0 {
-                step_x = -1;
-                wall_dist_x = (player.x - map_x as f32) * delta_dist_x;
-            } else {
-                step_x = 1;
-                wall_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
-            }
-            if ray_dir_y < 0.0 {
-                step_y = -1;
-                wall_dist_y = (player.y - map_y as f32) * delta_dist_y;
-            } else {
-                step_y = 1;
-                wall_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
-            }
-
-            let mut hit = false;
-            let mut wall_type = 0;
-            while !hit {
-                if wall_dist_x < wall_dist_y {
-                    wall_dist_x += delta_dist_x;
-                    map_x = (map_x as isize + step_x) as usize;
-                    wall_type = 0;
+                if ray_dir_x < 0.0 {
+                    step_x = -1;
+                    wall_dist_x = (player.x - map_x as f32) * delta_dist_x;
                 } else {
-                    wall_dist_y += delta_dist_y;
-                    map_y = (map_y as isize + step_y) as usize;
-                    wall_type = 1;
+                    step_x = 1;
+                    wall_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
                 }
 
-                if game_state.world.get_tile(map_x, map_y) == 1 {
-                    hit = true;
+                if ray_dir_y < 0.0 {
+                    step_y = -1;
+                    wall_dist_y = (player.y - map_y as f32) * delta_dist_y;
+                } else {
+                    step_y = 1;
+                    wall_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
                 }
-            }
 
-            let perp_wall_dist = if wall_type == 0 {
-                (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x
-            } else {
-                (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y
-            };
+                let mut hit = false;
+                let mut wall_type = 0;
 
-            let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-            let draw_start = (-line_height / 2 + HEIGHT as isize / 2).max(0) as usize;
-            let draw_end =
-                (line_height / 2 + HEIGHT as isize / 2).min(HEIGHT as isize - 1) as usize;
+                while !hit {
+                    if wall_dist_x < wall_dist_y {
+                        wall_dist_x += delta_dist_x;
+                        map_x = (map_x as isize + step_x) as usize;
+                        wall_type = 0;
+                    } else {
+                        wall_dist_y += delta_dist_y;
+                        map_y = (map_y as isize + step_y) as usize;
+                        wall_type = 1;
+                    }
 
-            let wall_color = if wall_type == 1 {
-                0x008A7755
-            } else {
-                0x00695A41
-            };
+                    if game_state.world.get_tile(map_x, map_y) == 1 {
+                        hit = true;
+                    }
+                }
 
-            for y in draw_start..draw_end {
-                self.buffer[y * WIDTH + x] = wall_color;
+                let perp_wall_dist = if wall_type == 0 {
+                    (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x
+                } else {
+                    (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y
+                };
+
+                let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
+                let draw_start = (-line_height / 2 + HEIGHT as isize / 2).max(0) as usize;
+                let draw_end =
+                    (line_height / 2 + HEIGHT as isize / 2).min(HEIGHT as isize - 1) as usize;
+
+                let wall_color = if wall_type == 1 {
+                    0x008A7755
+                } else {
+                    0x00695A41
+                };
+
+                for y in draw_start..draw_end {
+                    self.buffer[y * WIDTH + x] = wall_color;
+                }
             }
         }
     }
@@ -128,11 +128,39 @@ fn main() -> Result<()> {
     io::stdin().read_line(&mut server_ip)?;
     let ip_only = server_ip.trim().rsplitn(2, ':').last().unwrap().trim();
     let server_address = format!("{}:{}", ip_only, PORT);
-
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.connect(server_address)?;
+    let connect_message = ClientMessage::Connect;
+    let encoded_connect_message = bincode::serialize(&connect_message).unwrap();
+    socket.send(&encoded_connect_message)?;
     socket.set_nonblocking(true)?;
+    let mut buf = [0; 1024];
+    let mut my_id: Option<u64> = None;
 
+    // Loop to receive the Welcome message with a timeout
+    for _ in 0..100 {
+        // Try 100 times, with a small delay
+        match socket.recv_from(&mut buf) {
+            Ok((amt, _)) => {
+                if let Ok(welcome) = bincode::deserialize::<Welcome>(&buf[..amt]) {
+                    my_id = Some(welcome.id);
+                    println!("Connected to server with id: {}", welcome.id);
+                    break;
+                }
+            }
+
+            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+
+            Err(e) => {
+                eprintln!("Error receiving welcome message: {}", e);
+                return Err(e.into());
+            }
+        }
+    }
+
+    let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
     let event_loop = EventLoop::new()?;
     let mut input = WinitInputHelper::new();
     let window = Arc::new({
@@ -158,7 +186,6 @@ fn main() -> Result<()> {
 
     let mut renderer = Renderer::new();
     let mut game_state: Option<GameState> = None;
-
     let mut frame_count = 0;
     let mut fps_timer = Instant::now();
     let window_clone = window.clone();
@@ -172,14 +199,16 @@ fn main() -> Result<()> {
             } => {
                 mouse_dx = delta.0 as f32;
             }
+
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
                     elwt.exit();
                     return;
                 }
+
                 WindowEvent::RedrawRequested => {
                     if let Some(ref gs) = game_state {
-                        renderer.render(gs);
+                        renderer.render(gs, my_id);
                         renderer.draw_to_buffer(pixels.frame_mut());
                         if let Err(err) = pixels.render() {
                             eprintln!("pixels.render() failed: {}", err);
@@ -208,9 +237,11 @@ fn main() -> Result<()> {
             }
 
             let mut turn = mouse_dx * MOUSE_SPEED;
+
             if input.key_held(KeyCode::ArrowLeft) {
                 turn -= 1.0;
             }
+
             if input.key_held(KeyCode::ArrowRight) {
                 turn += 1.0;
             }
@@ -222,13 +253,14 @@ fn main() -> Result<()> {
                 right: input.key_held(KeyCode::KeyD),
                 turn,
             };
+
             mouse_dx = 0.0;
 
-            let encoded_input = bincode::serialize(&client_input).unwrap();
+            let encoded_input = bincode::serialize(&ClientMessage::Input(client_input)).unwrap();
+
             if let Err(e) = socket.send(&encoded_input) {
                 eprintln!("Error sending data: {}", e);
             }
-
             window_clone.request_redraw();
         }
 
@@ -242,9 +274,11 @@ fn main() -> Result<()> {
                         latest_game_state = Some(decoded_state);
                     }
                 }
+
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     break;
                 }
+
                 Err(e) => {
                     eprintln!("Error receiving data: {}", e);
                     break;
