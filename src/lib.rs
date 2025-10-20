@@ -10,7 +10,7 @@ pub struct Input {
     pub back: bool,
     pub left: bool,
     pub right: bool,
-    pub strafe: bool,
+    pub turn: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -38,7 +38,7 @@ impl Player {
         let mut new_y = self.y;
 
         let mut slower = 1.0;
-        if input.strafe && (input.left || input.right) && (input.forth || input.back) {
+        if (input.left || input.right) && (input.forth || input.back) {
             slower = 0.707;
         }
 
@@ -52,30 +52,21 @@ impl Player {
             new_y -= self.angle.sin() * self.move_speed * slower;
         }
 
-        if input.strafe {
-            let strafe_x = -self.angle.sin();
-            let strafe_y = self.angle.cos();
+        let strafe_x = -self.angle.sin();
+        let strafe_y = self.angle.cos();
 
-            if input.right {
-                new_x += strafe_x * self.move_speed * slower;
-                new_y += strafe_y * self.move_speed * slower;
-            }
-            if input.left {
-                new_x -= strafe_x * self.move_speed * slower;
-                new_y -= strafe_y * self.move_speed * slower;
-            }
+        if input.right {
+            new_x += strafe_x * self.move_speed * slower;
+            new_y += strafe_y * self.move_speed * slower;
+        }
+        if input.left {
+            new_x -= strafe_x * self.move_speed * slower;
+            new_y -= strafe_y * self.move_speed * slower;
         }
 
         self.check_collision_and_move(new_x, new_y, world);
 
-        if !input.strafe {
-            if input.left {
-                self.angle -= self.rot_speed;
-            }
-            if input.right {
-                self.angle += self.rot_speed;
-            }
-        }
+        self.angle += input.turn * self.rot_speed;
     }
 
     fn check_collision_and_move(&mut self, new_x: f32, new_y: f32, world: &World) {
