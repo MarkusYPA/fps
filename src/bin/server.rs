@@ -1,4 +1,4 @@
-use fps::{ClientMessage, GameState, PORT, Player, Welcome};
+use fps::{ClientMessage, GameState, Player, PlayerUpdate, ServerMessage, Welcome, PORT};
 use local_ip_address::local_ip;
 use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
@@ -26,7 +26,7 @@ fn main() -> std::io::Result<()> {
                             clients.insert(src, next_id);
 
                             let welcome = Welcome { id: next_id };
-                            let encoded_welcome = bincode::serialize(&welcome).unwrap();
+                            let encoded_welcome = bincode::serialize(&ServerMessage::Welcome(welcome)).unwrap();
                             socket.send_to(&encoded_welcome, src)?;
 
                             game_state
@@ -42,9 +42,18 @@ fn main() -> std::io::Result<()> {
                     }
                 }
 
-                let encoded_game_state = bincode::serialize(&game_state).unwrap();
+                let mut player_updates = HashMap::new();
+                for (id, player) in &game_state.players {
+                    player_updates.insert(id.clone(), PlayerUpdate {
+                        x: player.x,
+                        y: player.y,
+                        angle: player.angle,
+                    });
+                }
+
+                let encoded_game_update = bincode::serialize(&ServerMessage::GameUpdate(player_updates)).unwrap();
                 for client_addr in clients.keys() {
-                    socket.send_to(&encoded_game_state, client_addr)?;
+                    socket.send_to(&encoded_game_update, client_addr)?;
                 }
             }
             Err(e) => {

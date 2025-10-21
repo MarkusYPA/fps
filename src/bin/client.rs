@@ -12,9 +12,7 @@ use winit::keyboard::KeyCode;
 use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
-use fps::{ClientMessage, GameState, HEIGHT, Input, PORT, WIDTH, Welcome};
-
-use rayon::prelude::*;
+use fps::{ClientMessage, GameState, HEIGHT, Input, Player, PORT, ServerMessage, WIDTH};
 
 const MOUSE_SPEED: f32 = 0.06;
 
@@ -33,98 +31,84 @@ impl Renderer {
         // Clear the buffer with ceiling and floor colors
         for y in 0..HEIGHT / 2 {
             for x in 0..WIDTH {
-                self.buffer[y * WIDTH + x] = 0x00AACCFFu32; // Ceiling
+                self.buffer[y * WIDTH + x] = 0x00AACCFF; // Ceiling
             }
         }
         for y in HEIGHT / 2..HEIGHT {
             for x in 0..WIDTH {
-                self.buffer[y * WIDTH + x] = 0x00555555u32; // Floor
+                self.buffer[y * WIDTH + x] = 0x00555555; // Floor
             }
         }
 
         if let Some(player) = game_state.players.get(&my_id.to_string()) {
-            let columns: Vec<(usize, Vec<(usize, u32)>)> = (0..WIDTH)
-                .into_par_iter()
-                .map(|x| {
-                    let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
-                    let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
-                    let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
+            for x in 0..WIDTH {
+                let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
+                let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
+                let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
 
-                    let mut map_x = player.x as usize;
-                    let mut map_y = player.y as usize;
+                let mut map_x = player.x as usize;
+                let mut map_y = player.y as usize;
 
-                    let delta_dist_x = (1.0f32 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
-                    let delta_dist_y = (1.0f32 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
+                let delta_dist_x = (1.0f32 + (ray_dir_y / ray_dir_x).powi(2)).sqrt();
+                let delta_dist_y = (1.0f32 + (ray_dir_x / ray_dir_y).powi(2)).sqrt();
 
-                    let step_x;
-                    let step_y;
-                    let mut wall_dist_x;
-                    let mut wall_dist_y;
+                let step_x;
+                let step_y;
+                let mut wall_dist_x;
+                let mut wall_dist_y;
 
-                    if ray_dir_x < 0.0 {
-                        step_x = -1;
-                        wall_dist_x = (player.x - map_x as f32) * delta_dist_x;
+                if ray_dir_x < 0.0 {
+                    step_x = -1;
+                    wall_dist_x = (player.x - map_x as f32) * delta_dist_x;
+                } else {
+                    step_x = 1;
+                    wall_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
+                }
+                if ray_dir_y < 0.0 {
+                    step_y = -1;
+                    wall_dist_y = (player.y - map_y as f32) * delta_dist_y;
+                } else {
+                    step_y = 1;
+                    wall_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
+                }
+
+                let mut hit = false;
+                let mut wall_type = 0;
+                while !hit {
+                    if wall_dist_x < wall_dist_y {
+                        wall_dist_x += delta_dist_x;
+                        map_x = (map_x as isize + step_x) as usize;
+                        wall_type = 0;
                     } else {
-                        step_x = 1;
-                        wall_dist_x = (map_x as f32 + 1.0 - player.x) * delta_dist_x;
+                        wall_dist_y += delta_dist_y;
+                        map_y = (map_y as isize + step_y) as usize;
+                        wall_type = 1;
                     }
 
-                    if ray_dir_y < 0.0 {
-                        step_y = -1;
-                        wall_dist_y = (player.y - map_y as f32) * delta_dist_y;
-                    } else {
-                        step_y = 1;
-                        wall_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
+                    if game_state.world.get_tile(map_x, map_y) == 1 {
+                        hit = true;
                     }
+                }
 
-                    let mut hit = false;
-                    let mut wall_type = 0;
+                let perp_wall_dist = if wall_type == 0 {
+                    (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x
+                } else {
+                    (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y
+                };
 
-                    while !hit {
-                        if wall_dist_x < wall_dist_y {
-                            wall_dist_x += delta_dist_x;
-                            map_x = (map_x as isize + step_x) as usize;
-                            wall_type = 0;
-                        } else {
-                            wall_dist_y += delta_dist_y;
-                            map_y = (map_y as isize + step_y) as usize;
-                            wall_type = 1;
-                        }
+                let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
+                let draw_start = (-line_height / 2 + HEIGHT as isize / 2).max(0) as usize;
+                let draw_end =
+                    (line_height / 2 + HEIGHT as isize / 2).min(HEIGHT as isize - 1) as usize;
 
-                        if game_state.world.get_tile(map_x, map_y) == 1 {
-                            hit = true;
-                        }
-                    }
+                let wall_color = if wall_type == 1 {
+                    0x008A7755
+                } else {
+                    0x00695A41
+                };
 
-                    let perp_wall_dist = if wall_type == 0 {
-                        (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x
-                    } else {
-                        (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y
-                    };
-
-                    let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-                    let draw_start = (-line_height / 2 + HEIGHT as isize / 2).max(0) as usize;
-                    let draw_end =
-                        (line_height / 2 + HEIGHT as isize / 2).min(HEIGHT as isize - 1) as usize;
-
-                    let wall_color = if wall_type == 1 {
-                        0x008A7755
-                    } else {
-                        0x00695A41
-                    };
-
-                    let mut this_col: Vec<(usize, u32)> = Vec::new();
-                    for y in draw_start..draw_end {
-                        this_col.push((y, wall_color));
-                    }
-
-                    (x, this_col)
-                })
-                .collect();
-
-            for (x, col) in columns {
-                for (y, color) in col.into_iter() {
-                    self.buffer[y * WIDTH + x] = color;
+                for y in draw_start..draw_end {
+                    self.buffer[y * WIDTH + x] = wall_color;
                 }
             }
         }
@@ -145,33 +129,34 @@ fn main() -> Result<()> {
     io::stdin().read_line(&mut server_ip)?;
     let ip_only = server_ip.trim().rsplitn(2, ':').last().unwrap().trim();
     let server_address = format!("{}:{}", ip_only, PORT);
+
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.connect(server_address)?;
 
     let connect_message = ClientMessage::Connect;
     let encoded_connect_message = bincode::serialize(&connect_message).unwrap();
     socket.send(&encoded_connect_message)?;
+
     socket.set_nonblocking(true)?;
 
     let mut buf = [0; 1024];
     let mut my_id: Option<u64> = None;
 
     // Loop to receive the Welcome message with a timeout
-    for _ in 0..100 {
-        // Try 100 times, with a small delay
+    for _ in 0..100 { // Try 100 times, with a small delay
         match socket.recv_from(&mut buf) {
             Ok((amt, _)) => {
-                if let Ok(welcome) = bincode::deserialize::<Welcome>(&buf[..amt]) {
-                    my_id = Some(welcome.id);
-                    println!("Connected to server with id: {}", welcome.id);
-                    break;
+                if let Ok(server_message) = bincode::deserialize::<ServerMessage>(&buf[..amt]) {
+                    if let ServerMessage::Welcome(welcome) = server_message {
+                        my_id = Some(welcome.id);
+                        println!("Connected to server with id: {}", welcome.id);
+                        break;
+                    }
                 }
             }
-
             Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
-
             Err(e) => {
                 eprintln!("Error receiving welcome message: {}", e);
                 return Err(e.into());
@@ -180,9 +165,9 @@ fn main() -> Result<()> {
     }
 
     let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
+
     let event_loop = EventLoop::new()?;
     let mut input = WinitInputHelper::new();
-
     let window = Arc::new({
         let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
         WindowBuilder::new()
@@ -217,16 +202,15 @@ fn main() -> Result<()> {
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
-            } => {
+            }
+            => {
                 mouse_dx = delta.0 as f32;
             }
-
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
                     elwt.exit();
                     return;
                 }
-
                 WindowEvent::RedrawRequested => {
                     if let Some(ref gs) = game_state {
                         renderer.render(gs, my_id);
@@ -283,13 +267,44 @@ fn main() -> Result<()> {
         }
 
         let mut buf = [0; 1024];
-        let mut latest_game_state: Option<GameState> = None;
+        let latest_game_state: Option<GameState> = None;
 
         loop {
             match socket.recv(&mut buf) {
                 Ok(amt) => {
-                    if let Ok(decoded_state) = bincode::deserialize(&buf[..amt]) {
-                        latest_game_state = Some(decoded_state);
+                    if let Ok(server_message) = bincode::deserialize::<ServerMessage>(&buf[..amt]) {
+                        match server_message {
+                            ServerMessage::Welcome(_) => {
+                                // This should not happen after initial connection
+                                eprintln!("Received unexpected Welcome message");
+                            }
+                            ServerMessage::GameUpdate(player_updates) => {
+                                if let Some(ref mut gs) = game_state {
+                                    for (id, update) in player_updates {
+                                        if let Some(player) = gs.players.get_mut(&id) {
+                                            player.x = update.x;
+                                            player.y = update.y;
+                                            player.angle = update.angle;
+                                        }
+                                    }
+                                } else { // If game_state is None, initialize it with the updates
+                                    let mut players = std::collections::HashMap::new();
+                                    for (id, update) in player_updates {
+                                        players.insert(id, Player {
+                                            x: update.x,
+                                            y: update.y,
+                                            angle: update.angle,
+                                            move_speed: 0.05, // Default values for new players
+                                            rot_speed: 0.03,
+                                        });
+                                    }
+                                    game_state = Some(GameState {
+                                        players,
+                                        world: fps::World::new(), // Initialize world as well
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {

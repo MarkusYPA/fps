@@ -11,6 +11,12 @@ pub enum ClientMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum ServerMessage {
+    Welcome(Welcome),
+    GameUpdate(std::collections::HashMap<String, PlayerUpdate>),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Welcome {
     pub id: u64,
 }
@@ -31,6 +37,13 @@ pub struct Player {
     pub angle: f32,
     pub move_speed: f32,
     pub rot_speed: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PlayerUpdate {
+    pub x: f32,
+    pub y: f32,
+    pub angle: f32,
 }
 
 impl Player {
