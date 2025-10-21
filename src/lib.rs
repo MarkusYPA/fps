@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub mod renderer;
+
 pub const WIDTH: usize = 1024;
 pub const HEIGHT: usize = 768;
 pub const PORT: u16 = 8080;

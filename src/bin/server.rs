@@ -18,7 +18,6 @@ fn main() -> std::io::Result<()> {
 
     let tick_rate = 100; // ticks per second
     let tick_duration = Duration::from_secs(1) / tick_rate;
-    //let tick_duration = Duration::from_millis(50) / tick_rate;
     let mut last_tick = Instant::now();
 
     socket.set_nonblocking(true)?;
