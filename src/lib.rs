@@ -21,7 +21,7 @@ pub struct Welcome {
     pub id: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct Input {
     pub forth: bool,
     pub back: bool,

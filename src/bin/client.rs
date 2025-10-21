@@ -196,6 +196,7 @@ fn main() -> Result<()> {
     let mut fps_timer = Instant::now();
     let window_clone = window.clone();
     let mut mouse_dx = 0.0;
+    let mut prev_input: Option<Input> = None;
 
     Ok(event_loop.run(move |event, elwt| {
         match &event {
@@ -258,9 +259,12 @@ fn main() -> Result<()> {
             };
             mouse_dx = 0.0;
 
-            let encoded_input = bincode::serialize(&ClientMessage::Input(client_input)).unwrap();
-            if let Err(e) = socket.send(&encoded_input) {
-                eprintln!("Error sending data: {}", e);
+            if Some(client_input.clone()) != prev_input {
+                let encoded_input = bincode::serialize(&ClientMessage::Input(client_input.clone())).unwrap();
+                if let Err(e) = socket.send(&encoded_input) {
+                    eprintln!("Error sending data: {}", e);
+                }
+                prev_input = Some(client_input.clone());
             }
 
             window_clone.request_redraw();
