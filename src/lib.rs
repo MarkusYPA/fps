@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub mod renderer;
+
 pub const WIDTH: usize = 1024;
 pub const HEIGHT: usize = 768;
 pub const PORT: u16 = 8080;
@@ -11,11 +13,17 @@ pub enum ClientMessage {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum ServerMessage {
+    Welcome(Welcome),
+    GameUpdate(std::collections::HashMap<String, PlayerUpdate>),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Welcome {
     pub id: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct Input {
     pub forth: bool,
     pub back: bool,
@@ -31,6 +39,13 @@ pub struct Player {
     pub angle: f32,
     pub move_speed: f32,
     pub rot_speed: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PlayerUpdate {
+    pub x: f32,
+    pub y: f32,
+    pub angle: f32,
 }
 
 impl Player {
