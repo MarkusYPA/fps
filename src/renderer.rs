@@ -81,9 +81,10 @@ impl Renderer {
                 };
 
                 let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-                let draw_start = (-line_height / 2 + HEIGHT as isize / 2).max(0) as usize;
+                let pitch_offset = (player.pitch * HEIGHT as f32 / 2.0) as isize;
+                let draw_start = (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset).max(0) as usize;
                 let draw_end =
-                    (line_height / 2 + HEIGHT as isize / 2).min(HEIGHT as isize - 1) as usize;
+                    (line_height / 2 + HEIGHT as isize / 2 + pitch_offset).min(HEIGHT as isize - 1) as usize;
 
                 let wall_color = if wall_type == 1 {
                     0x008A7755
