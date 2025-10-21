@@ -163,11 +163,11 @@ fn main() -> Result<()> {
                 prev_input = Some(client_input.clone());
             }
 
-            window_clone.request_redraw();
+            // moved to end of event loop - has to redraw when others move too
+            // window_clone.request_redraw();
         }
 
         let mut buf = [0; 1024];
-        let latest_game_state: Option<GameState> = None;
 
         loop {
             match socket.recv(&mut buf) {
@@ -221,8 +221,6 @@ fn main() -> Result<()> {
             }
         }
 
-        if latest_game_state.is_some() {
-            game_state = latest_game_state;
-        }
+        window_clone.request_redraw();
     })?)
 }
