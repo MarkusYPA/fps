@@ -97,9 +97,9 @@ impl Player {
         self.check_collision_and_move(new_x, new_y, world);
 
         self.angle += input.turn * self.rot_speed;
-        self.pitch = (self.pitch + input.pitch * self.rot_speed).clamp(
-            -std::f32::consts::PI / 4.5,  // restrict pitch angle
-            std::f32::consts::PI / 4.5,
+        self.pitch = (self.pitch + input.pitch * self.rot_speed * 2.0).clamp(
+            -std::f32::consts::PI / 2.5,  // restrict pitch angle
+            std::f32::consts::PI / 2.5,
         );
     }
 

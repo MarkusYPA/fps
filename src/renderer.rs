@@ -25,15 +25,16 @@ impl Renderer {
         }
 
         if let Some(player) = game_state.players.get(&my_id.to_string()) {
-            let horizon_offset = (player.pitch * HEIGHT as f32 / 2.0) as isize;
+            let pitch_offset = (player.pitch * HEIGHT as f32 / 2.0) as isize;
+            let horizon = (HEIGHT as isize / 2 + pitch_offset).clamp(0, HEIGHT as isize) as usize;
 
             // Clear the buffer with ceiling and floor colors
-            for y in 0..(HEIGHT as isize / 2 + horizon_offset).max(0) as usize {
+            for y in 0..horizon {
                 for x in 0..WIDTH {
                     self.buffer[y * WIDTH + x] = 0x00AACCFF; // Ceiling
                 }
             }
-            for y in (HEIGHT as isize / 2 + horizon_offset).max(0) as usize..HEIGHT {
+            for y in horizon..HEIGHT {
                 for x in 0..WIDTH {
                     self.buffer[y * WIDTH + x] = 0x00555555; // Floor
                 }
@@ -94,11 +95,10 @@ impl Renderer {
                 };
 
                 let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-                let pitch_offset = (player.pitch * HEIGHT as f32 / 2.0) as isize;
-                let draw_start =
-                    (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset).max(0) as usize;
+                let draw_start = (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset)
+                    .clamp(0, HEIGHT as isize - 1) as usize;
                 let draw_end = (line_height / 2 + HEIGHT as isize / 2 + pitch_offset)
-                    .min(HEIGHT as isize - 1) as usize;
+                    .clamp(0, HEIGHT as isize) as usize;
 
                 let wall_color = if wall_type == 1 {
                     0x008A7755
