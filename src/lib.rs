@@ -98,8 +98,8 @@ impl Player {
 
         self.angle += input.turn * self.rot_speed;
         self.pitch = (self.pitch + input.pitch * self.rot_speed).clamp(
-            -std::f32::consts::PI / 6.0,  // -30 degrees
-            std::f32::consts::PI / 6.0,   // 30 degrees
+            -std::f32::consts::PI / 4.5,  // restrict pitch angle
+            std::f32::consts::PI / 4.5,
         );
     }
 
