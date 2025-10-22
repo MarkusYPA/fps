@@ -44,6 +44,10 @@ fn main() -> std::io::Result<()> {
                                     .insert(next_id.to_string(), Player::new());
                                 client_inputs.insert(next_id, fps::Input::default()); // Initialize with default input
                                 next_id += 1;
+
+                                let initial_state = ServerMessage::InitialState(game_state.clone());
+                                let encoded_initial_state = bincode::serialize(&initial_state).unwrap();
+                                socket.send_to(&encoded_initial_state, src)?;
                             }
                         }
                         ClientMessage::Input(input) => {

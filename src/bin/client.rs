@@ -13,7 +13,7 @@ use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
-    ClientMessage, GameState, HEIGHT, Input, PORT, Player, ServerMessage, WIDTH, renderer::Renderer,
+    ClientMessage, GameState, HEIGHT, Input, PORT, ServerMessage, WIDTH, renderer::Renderer,
 };
 
 const MOUSE_SPEED: f32 = 0.06;
@@ -166,9 +166,6 @@ fn main() -> Result<()> {
                 }
                 prev_input = Some(client_input.clone());
             }
-
-            // moved to end of event loop - has to redraw when others move too
-            // window_clone.request_redraw();
         }
 
         let mut buf = [0; 1024];
@@ -182,6 +179,9 @@ fn main() -> Result<()> {
                                 // This should not happen after initial connection
                                 eprintln!("Received unexpected Welcome message");
                             }
+                            ServerMessage::InitialState(initial_state) => {
+                                game_state = Some(initial_state);
+                            }
                             ServerMessage::GameUpdate(player_updates) => {
                                 if let Some(ref mut gs) = game_state {
                                     for (id, update) in player_updates {
@@ -192,27 +192,7 @@ fn main() -> Result<()> {
                                             player.pitch = update.pitch;
                                         }
                                     }
-                                } else {
-                                    // If game_state is None, initialize it with the updates
-                                    let mut players = std::collections::HashMap::new();
-                                    for (id, update) in player_updates {
-                                        players.insert(
-                                            id,
-                                            Player {
-                                                x: update.x,
-                                                y: update.y,
-                                                angle: update.angle,
-                                                pitch: 0.0,
-                                                move_speed: 0.05, // Default values for new players
-                                                rot_speed: 0.03,
-                                            },
-                                        );
-                                    }
-                                    game_state = Some(GameState {
-                                        players,
-                                        world: fps::World::new(), // Initialize world as well
-                                    });
-                                }
+                                } 
                             }
                         }
                     }

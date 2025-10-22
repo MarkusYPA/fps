@@ -16,6 +16,7 @@ pub enum ClientMessage {
 pub enum ServerMessage {
     Welcome(Welcome),
     GameUpdate(std::collections::HashMap<String, PlayerUpdate>),
+    InitialState(GameState),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
