@@ -95,9 +95,10 @@ impl Renderer {
                 };
 
                 let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-                let draw_start = (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset)
+                let z_offset = (player.z * line_height as f32) as isize;
+                let draw_start = (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
                     .clamp(0, HEIGHT as isize - 1) as usize;
-                let draw_end = (line_height / 2 + HEIGHT as isize / 2 + pitch_offset)
+                let draw_end = (line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
                     .clamp(0, HEIGHT as isize) as usize;
 
                 let wall_color = if wall_type == 1 {

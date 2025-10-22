@@ -38,5 +38,6 @@ The game window will open, and you can start playing. The client captures your k
 
 - **WASD Keys:** Move
 - **Mouse:** Turn
+- **Space:** Jump
 - **Arrow Keys**: Simple movement
 - **Escape:** Exit the game
