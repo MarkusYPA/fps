@@ -81,6 +81,7 @@ fn main() -> std::io::Result<()> {
                     x: player.x,
                     y: player.y,
                     angle: player.angle,
+                    pitch: player.pitch,
                 });
             }
 

@@ -30,6 +30,7 @@ pub struct Input {
     pub left: bool,
     pub right: bool,
     pub turn: f32,
+    pub pitch: f32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -37,6 +38,7 @@ pub struct Player {
     pub x: f32,
     pub y: f32,
     pub angle: f32,
+    pub pitch: f32,
     pub move_speed: f32,
     pub rot_speed: f32,
 }
@@ -46,6 +48,7 @@ pub struct PlayerUpdate {
     pub x: f32,
     pub y: f32,
     pub angle: f32,
+    pub pitch: f32,
 }
 
 impl Player {
@@ -54,6 +57,7 @@ impl Player {
             x: 1.5,
             y: 1.5,
             angle: std::f32::consts::PI / 2.0,
+            pitch: 0.0,
             move_speed: 0.05,
             rot_speed: 0.03,
         }
@@ -93,6 +97,10 @@ impl Player {
         self.check_collision_and_move(new_x, new_y, world);
 
         self.angle += input.turn * self.rot_speed;
+        self.pitch = (self.pitch + input.pitch * self.rot_speed * 2.0).clamp(
+            -std::f32::consts::PI / 2.5,  // restrict pitch angle
+            std::f32::consts::PI / 2.5,
+        );
     }
 
     fn check_collision_and_move(&mut self, new_x: f32, new_y: f32, world: &World) {

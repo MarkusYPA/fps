@@ -92,6 +92,7 @@ fn main() -> Result<()> {
     let mut fps_timer = Instant::now();
     let window_clone = window.clone();
     let mut mouse_dx = 0.0;
+    let mut mouse_dy = 0.0;
     let mut prev_input: Option<Input> = None;
 
     Ok(event_loop.run(move |event, elwt| {
@@ -101,6 +102,7 @@ fn main() -> Result<()> {
                 ..
             } => {
                 mouse_dx = delta.0 as f32;
+                mouse_dy = delta.1 as f32;
             }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
@@ -151,8 +153,10 @@ fn main() -> Result<()> {
                 left: input.key_held(KeyCode::KeyA),
                 right: input.key_held(KeyCode::KeyD),
                 turn,
+                pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
             };
             mouse_dx = 0.0;
+            mouse_dy = 0.0;
 
             if Some(client_input.clone()) != prev_input {
                 let encoded_input =
@@ -185,6 +189,7 @@ fn main() -> Result<()> {
                                             player.x = update.x;
                                             player.y = update.y;
                                             player.angle = update.angle;
+                                            player.pitch = update.pitch;
                                         }
                                     }
                                 } else {
@@ -197,6 +202,7 @@ fn main() -> Result<()> {
                                                 x: update.x,
                                                 y: update.y,
                                                 angle: update.angle,
+                                                pitch: 0.0,
                                                 move_speed: 0.05, // Default values for new players
                                                 rot_speed: 0.03,
                                             },
