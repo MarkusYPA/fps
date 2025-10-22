@@ -32,14 +32,17 @@ pub struct Input {
     pub right: bool,
     pub turn: f32,
     pub pitch: f32,
+    pub jump: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Player {
     pub x: f32,
     pub y: f32,
+    pub z: f32,
     pub angle: f32,
     pub pitch: f32,
+    pub velocity_z: f32,
     pub move_speed: f32,
     pub rot_speed: f32,
 }
@@ -48,6 +51,7 @@ pub struct Player {
 pub struct PlayerUpdate {
     pub x: f32,
     pub y: f32,
+    pub z: f32,
     pub angle: f32,
     pub pitch: f32,
 }
@@ -57,8 +61,10 @@ impl Player {
         Player {
             x: 1.5,
             y: 1.5,
+            z: 0.0,
             angle: std::f32::consts::PI / 2.0,
             pitch: 0.0,
+            velocity_z: 0.0,
             move_speed: 0.05,
             rot_speed: 0.03,
         }
@@ -96,6 +102,10 @@ impl Player {
         }
 
         self.check_collision_and_move(new_x, new_y, world);
+
+        if input.jump && self.z == 0.0 {
+            self.velocity_z = 0.028;
+        }
 
         self.angle += input.turn * self.rot_speed;
         self.pitch = (self.pitch + input.pitch * self.rot_speed * 2.0).clamp(

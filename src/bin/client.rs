@@ -154,6 +154,7 @@ fn main() -> Result<()> {
                 right: input.key_held(KeyCode::KeyD),
                 turn,
                 pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
+                jump: input.key_pressed(KeyCode::Space),
             };
             mouse_dx = 0.0;
             mouse_dy = 0.0;
@@ -188,11 +189,12 @@ fn main() -> Result<()> {
                                         if let Some(player) = gs.players.get_mut(&id) {
                                             player.x = update.x;
                                             player.y = update.y;
+                                            player.z = update.z;
                                             player.angle = update.angle;
                                             player.pitch = update.pitch;
                                         }
                                     }
-                                } 
+                                }
                             }
                         }
                     }

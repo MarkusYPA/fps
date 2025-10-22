@@ -78,12 +78,24 @@ fn main() -> std::io::Result<()> {
                 game_state.update(id.to_string(), input);
             }
 
+            // Adjust players' z if jumped
+            for player in game_state.players.values_mut() {
+                player.z += player.velocity_z;
+                if player.z > 0.0 {
+                    player.velocity_z -= 0.001;
+                } else {
+                    player.velocity_z = 0.0;
+                    player.z = 0.0;
+                }
+            }
+
             // Prepare and send game update to all clients
             let mut player_updates = HashMap::new();
             for (id, player) in &game_state.players {
                 player_updates.insert(id.clone(), PlayerUpdate {
                     x: player.x,
                     y: player.y,
+                    z: player.z,
                     angle: player.angle,
                     pitch: player.pitch,
                 });
