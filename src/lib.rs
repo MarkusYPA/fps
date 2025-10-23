@@ -180,7 +180,7 @@ impl GameState {
             players: HashMap::new(),
             world: World::new(),
             sprites: vec![
-                Sprite { x: 4.0, y: 4.0, z: 0.0, texture: 0, width: 0.35, height: 0.6 },
+                Sprite { x: 3.2, y: 4.3, z: 0.0, texture: 0, width: 0.2, height: 0.55 },
             ]
         }
     }

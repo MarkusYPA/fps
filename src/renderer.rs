@@ -138,7 +138,8 @@ impl Renderer {
                     let sprite_screen_x = (WIDTH as f32 / 2.0) * (1.0 + transform_x / transform_y);
 
                     let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite.height;
-                    let sprite_vertical_offset = (player.z - sprite.z) * HEIGHT as f32 / transform_y - 0.5 + sprite_height * 0.5;
+                    let world_half = (HEIGHT as f32 / transform_y).abs() * 0.5;
+                    let sprite_vertical_offset = (player.z - sprite.z) * HEIGHT as f32 / transform_y - sprite_height * 0.5 + world_half;
 
                     let draw_start_y = (-sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_vertical_offset)
                         .max(0.0) as usize;
