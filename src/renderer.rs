@@ -1,15 +1,17 @@
-use crate::{GameState, HEIGHT, WIDTH};
+use crate::{GameState, HEIGHT, WIDTH, textures::TextureManager};
 
 pub struct Renderer {
     buffer: Vec<u32>,
     z_buffer: Vec<f32>,
+    texture_manager: TextureManager,
 }
 
 impl Renderer {
-    pub fn new() -> Self {
+    pub fn new(texture_manager: TextureManager) -> Self {
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT],
             z_buffer: vec![0.0; WIDTH],
+            texture_manager,
         }
     }
 
@@ -135,7 +137,7 @@ impl Renderer {
                 if transform_y > 0.0 { // only draw sprites in front of the player
                     let sprite_screen_x = (WIDTH as f32 / 2.0) * (1.0 + transform_x / transform_y);
 
-                    let sprite_height = (HEIGHT as f32 / transform_y).abs();
+                    let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite.height;
                     let sprite_z_offset = (player.z * HEIGHT as f32 / transform_y) as isize;
 
                     let draw_start_y = (-sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_z_offset as f32)
@@ -143,14 +145,25 @@ impl Renderer {
                     let draw_end_y = (sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_z_offset as f32)
                         .min(HEIGHT as f32) as usize;
 
-                    let sprite_width = (WIDTH as f32 / transform_y).abs();
+                    let sprite_width = (WIDTH as f32 / transform_y).abs() * sprite.width;
                     let draw_start_x = (sprite_screen_x - sprite_width / 2.0).max(0.0) as usize;
                     let draw_end_x = (sprite_screen_x + sprite_width / 2.0).min(WIDTH as f32) as usize;
 
-                    for stripe in draw_start_x..draw_end_x {
-                        if self.z_buffer[stripe] > transform_y {
-                            for y in draw_start_y..draw_end_y {
-                                self.buffer[y * WIDTH + stripe] = 0x00FF0000; // Red sprite
+                    if let Some(texture) = self.texture_manager.get_texture(sprite.texture) {
+                        for stripe in draw_start_x..draw_end_x {
+                            if transform_y < self.z_buffer[stripe] {
+                                let tex_x = ((stripe as f32 - (sprite_screen_x - sprite_width / 2.0)) * texture.width as f32 / sprite_width) as u32;
+
+                                for y in draw_start_y..draw_end_y {
+                                    let tex_y = ((y as f32 - (HEIGHT as f32 / 2.0 - sprite_height / 2.0 + pitch_offset as f32 + sprite_z_offset as f32)) * texture.height as f32 / sprite_height) as u32;
+
+                                    let color = texture.pixels[(tex_y * texture.width + tex_x) as usize];
+                                    let alpha = (color >> 24) & 0xFF;
+
+                                    if alpha > 0 {
+                                        self.buffer[y * WIDTH + stripe] = color;
+                                    }
+                                }
                             }
                         }
                     }

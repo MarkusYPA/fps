@@ -13,7 +13,7 @@ use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
-    ClientMessage, GameState, HEIGHT, Input, PORT, ServerMessage, WIDTH, renderer::Renderer,
+    ClientMessage, GameState, HEIGHT, Input, PORT, ServerMessage, WIDTH, renderer::Renderer, textures::TextureManager,
 };
 
 const MOUSE_SPEED: f32 = 0.06;
@@ -85,7 +85,10 @@ fn main() -> Result<()> {
         Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
     };
 
-    let mut renderer = Renderer::new();
+    let mut texture_manager = TextureManager::new();
+    let character_texture_idx = texture_manager.load_texture("assets/character1.png")?;
+
+    let mut renderer = Renderer::new(texture_manager);
     let mut game_state: Option<GameState> = None;
 
     let mut frame_count = 0;
