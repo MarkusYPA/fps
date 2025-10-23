@@ -38,6 +38,7 @@ pub struct PlayerUpdate {
 pub struct Sprite {
     pub x: f32,
     pub y: f32,
+    pub z: f32,
     pub texture: usize,
     pub width: f32,
     pub height: f32,
@@ -179,7 +180,7 @@ impl GameState {
             players: HashMap::new(),
             world: World::new(),
             sprites: vec![
-                Sprite { x: 3.7, y: 4.2, texture: 0, width: 0.35, height: 0.75 },
+                Sprite { x: 4.0, y: 4.0, z: 0.0, texture: 0, width: 0.35, height: 0.6 },
             ]
         }
     }

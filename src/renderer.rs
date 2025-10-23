@@ -138,11 +138,11 @@ impl Renderer {
                     let sprite_screen_x = (WIDTH as f32 / 2.0) * (1.0 + transform_x / transform_y);
 
                     let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite.height;
-                    let sprite_z_offset = (player.z * HEIGHT as f32 / transform_y) as isize;
+                    let sprite_vertical_offset = (player.z - sprite.z) * HEIGHT as f32 / transform_y - 0.5 + sprite_height * 0.5;
 
-                    let draw_start_y = (-sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_z_offset as f32)
+                    let draw_start_y = (-sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_vertical_offset)
                         .max(0.0) as usize;
-                    let draw_end_y = (sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_z_offset as f32)
+                    let draw_end_y = (sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_vertical_offset)
                         .min(HEIGHT as f32) as usize;
 
                     let sprite_width = (WIDTH as f32 / transform_y).abs() * sprite.width;
@@ -155,7 +155,7 @@ impl Renderer {
                                 let tex_x = ((stripe as f32 - (sprite_screen_x - sprite_width / 2.0)) * texture.width as f32 / sprite_width) as u32;
 
                                 for y in draw_start_y..draw_end_y {
-                                    let tex_y = ((y as f32 - (HEIGHT as f32 / 2.0 - sprite_height / 2.0 + pitch_offset as f32 + sprite_z_offset as f32)) * texture.height as f32 / sprite_height) as u32;
+                                    let tex_y = ((y as f32 - (HEIGHT as f32 / 2.0 - sprite_height / 2.0 + pitch_offset as f32 + sprite_vertical_offset as f32)) * texture.height as f32 / sprite_height) as u32;
 
                                     let color = texture.pixels[(tex_y * texture.width + tex_x) as usize];
                                     let alpha = (color >> 24) & 0xFF;
