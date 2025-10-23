@@ -2,12 +2,14 @@ use crate::{GameState, HEIGHT, WIDTH};
 
 pub struct Renderer {
     buffer: Vec<u32>,
+    z_buffer: Vec<f32>,
 }
 
 impl Renderer {
     pub fn new() -> Self {
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT],
+            z_buffer: vec![0.0; WIDTH],
         }
     }
 
@@ -94,6 +96,8 @@ impl Renderer {
                     (map_y as f32 - player.y + (1.0 - step_y as f32) / 2.0) / ray_dir_y
                 };
 
+                self.z_buffer[x] = perp_wall_dist;
+
                 let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
                 let z_offset = (player.z * line_height as f32) as isize;
                 let draw_start = (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
@@ -109,6 +113,47 @@ impl Renderer {
 
                 for y in draw_start..draw_end {
                     self.buffer[y * WIDTH + x] = wall_color;
+                }
+            }
+
+            // Sprite rendering
+            for sprite in &game_state.sprites {
+                let sprite_x = sprite.x - player.x;
+                let sprite_y = sprite.y - player.y;
+
+                let dir_x = player.angle.cos();
+                let dir_y = player.angle.sin();
+
+                let plane_x = -dir_y * 0.66;
+                let plane_y = dir_x * 0.66;
+
+                let inv_det = 1.0 / (plane_x * dir_y - dir_x * plane_y);
+
+                let transform_x = inv_det * (dir_y * sprite_x - dir_x * sprite_y);
+                let transform_y = inv_det * (-plane_y * sprite_x + plane_x * sprite_y);
+
+                if transform_y > 0.0 { // only draw sprites in front of the player
+                    let sprite_screen_x = (WIDTH as f32 / 2.0) * (1.0 + transform_x / transform_y);
+
+                    let sprite_height = (HEIGHT as f32 / transform_y).abs();
+                    let sprite_z_offset = (player.z * HEIGHT as f32 / transform_y) as isize;
+
+                    let draw_start_y = (-sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_z_offset as f32)
+                        .max(0.0) as usize;
+                    let draw_end_y = (sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_z_offset as f32)
+                        .min(HEIGHT as f32) as usize;
+
+                    let sprite_width = (WIDTH as f32 / transform_y).abs();
+                    let draw_start_x = (sprite_screen_x - sprite_width / 2.0).max(0.0) as usize;
+                    let draw_end_x = (sprite_screen_x + sprite_width / 2.0).min(WIDTH as f32) as usize;
+
+                    for stripe in draw_start_x..draw_end_x {
+                        if self.z_buffer[stripe] > transform_y {
+                            for y in draw_start_y..draw_end_y {
+                                self.buffer[y * WIDTH + stripe] = 0x00FF0000; // Red sprite
+                            }
+                        }
+                    }
                 }
             }
         }

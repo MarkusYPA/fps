@@ -56,6 +56,13 @@ pub struct PlayerUpdate {
     pub pitch: f32,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Sprite {
+    pub x: f32,
+    pub y: f32,
+    pub texture: usize,
+}
+
 impl Player {
     pub fn new() -> Self {
         Player {
@@ -160,6 +167,7 @@ use std::collections::HashMap;
 pub struct GameState {
     pub players: HashMap<String, Player>,
     pub world: World,
+    pub sprites: Vec<Sprite>,
 }
 
 impl GameState {
@@ -167,6 +175,9 @@ impl GameState {
         GameState {
             players: HashMap::new(),
             world: World::new(),
+            sprites: vec![
+                Sprite { x: 4.0, y: 4.0, texture: 0 },
+            ]
         }
     }
 
