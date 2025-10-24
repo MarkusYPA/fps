@@ -119,7 +119,17 @@ impl Renderer {
             }
 
             // Sprite rendering
-            for sprite in &game_state.sprites {
+
+            // Sort sprites by distance
+            let mut sprites_with_dist: Vec<_> = game_state.sprites.iter().map(|sprite| {
+                let sprite_x = sprite.x - player.x;
+                let sprite_y = sprite.y - player.y;
+                let dist_sq = sprite_x * sprite_x + sprite_y * sprite_y;
+                (sprite, dist_sq)
+            }).collect();
+            sprites_with_dist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+            for (sprite, _) in sprites_with_dist {
                 let sprite_x = sprite.x - player.x;
                 let sprite_y = sprite.y - player.y;
 

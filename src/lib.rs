@@ -181,6 +181,7 @@ impl GameState {
             world: World::new(),
             sprites: vec![
                 Sprite { x: 3.2, y: 4.3, z: 0.0, texture: 0, width: 0.2, height: 0.65 },
+                Sprite { x: 4.2, y: 4.3, z: 0.0, texture: 1, width: 0.2, height: 0.65 },
             ]
         }
     }
