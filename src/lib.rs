@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod renderer;
+pub mod textures;
 
 pub const WIDTH: usize = 1024;
 pub const HEIGHT: usize = 768;
@@ -24,6 +25,25 @@ pub struct Welcome {
     pub id: u64,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PlayerUpdate {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub angle: f32,
+    pub pitch: f32,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Sprite {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub texture: String,
+    pub width: f32,
+    pub height: f32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
 pub struct Input {
     pub forth: bool,
@@ -45,15 +65,6 @@ pub struct Player {
     pub velocity_z: f32,
     pub move_speed: f32,
     pub rot_speed: f32,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct PlayerUpdate {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub angle: f32,
-    pub pitch: f32,
 }
 
 impl Player {
@@ -160,6 +171,7 @@ use std::collections::HashMap;
 pub struct GameState {
     pub players: HashMap<String, Player>,
     pub world: World,
+    pub sprites: Vec<Sprite>,
 }
 
 impl GameState {
@@ -167,6 +179,10 @@ impl GameState {
         GameState {
             players: HashMap::new(),
             world: World::new(),
+            sprites: vec![
+                Sprite { x: 3.2, y: 4.3, z: 0.0, texture: "character2".to_string(), width: 0.2, height: 0.65 },
+                Sprite { x: 4.2, y: 4.3, z: 0.0, texture: "character3".to_string(), width: 0.2, height: 0.65 },
+            ]
         }
     }
 
