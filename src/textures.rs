@@ -30,31 +30,30 @@ impl Texture {
 }
 
 pub struct TextureManager {
-    textures: Vec<Texture>,
-    paths: HashMap<String, usize>,
+    textures: HashMap<String, Texture>,
 }
 
 impl TextureManager {
     pub fn new() -> Self {
         TextureManager {
-            textures: Vec::new(),
-            paths: HashMap::new(),
+            textures: HashMap::new(),
         }
     }
 
-    pub fn load_texture(&mut self, path: &str) -> Result<usize, image::ImageError> {
-        if let Some(idx) = self.paths.get(path) {
-            return Ok(*idx);
-        }
-
+    pub fn load_texture(&mut self, name: String, path: &str) -> Result<(), image::ImageError> {
         let texture = Texture::from_file(path)?;
-        let idx = self.textures.len();
-        self.textures.push(texture);
-        self.paths.insert(path.to_string(), idx);
-        Ok(idx)
+        self.textures.insert(name, texture);
+        Ok(())
     }
 
-    pub fn get_texture(&self, index: usize) -> Option<&Texture> {
-        self.textures.get(index)
+    pub fn get_texture(&self, name: &str) -> Option<&Texture> {
+        self.textures.get(name)
     }
+}
+
+pub fn load_game_textures(texture_manager: &mut TextureManager) -> Result<(), image::ImageError> {
+    texture_manager.load_texture("character1".to_string(), "assets/character1.png")?;
+    texture_manager.load_texture("character2".to_string(), "assets/character2.png")?;
+    texture_manager.load_texture("character3".to_string(), "assets/character3.png")?;
+    Ok(())
 }

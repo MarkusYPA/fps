@@ -39,7 +39,7 @@ pub struct Sprite {
     pub x: f32,
     pub y: f32,
     pub z: f32,
-    pub texture: usize,
+    pub texture: String,
     pub width: f32,
     pub height: f32,
 }
@@ -180,8 +180,8 @@ impl GameState {
             players: HashMap::new(),
             world: World::new(),
             sprites: vec![
-                Sprite { x: 3.2, y: 4.3, z: 0.0, texture: 0, width: 0.2, height: 0.65 },
-                Sprite { x: 4.2, y: 4.3, z: 0.0, texture: 1, width: 0.2, height: 0.65 },
+                Sprite { x: 3.2, y: 4.3, z: 0.0, texture: "character2".to_string(), width: 0.2, height: 0.65 },
+                Sprite { x: 4.2, y: 4.3, z: 0.0, texture: "character3".to_string(), width: 0.2, height: 0.65 },
             ]
         }
     }

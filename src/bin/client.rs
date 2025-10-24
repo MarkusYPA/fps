@@ -86,8 +86,7 @@ fn main() -> Result<()> {
     };
 
     let mut texture_manager = TextureManager::new();
-    texture_manager.load_texture("assets/character2.png")?;
-    texture_manager.load_texture("assets/character3.png")?;
+    fps::textures::load_game_textures(&mut texture_manager)?;
 
     let mut renderer = Renderer::new(texture_manager);
     let mut game_state: Option<GameState> = None;

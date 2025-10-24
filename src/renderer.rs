@@ -160,7 +160,7 @@ impl Renderer {
                     let draw_start_x = (sprite_screen_x - sprite_width / 2.0).max(0.0) as usize;
                     let draw_end_x = (sprite_screen_x + sprite_width / 2.0).min(WIDTH as f32) as usize;
 
-                    if let Some(texture) = self.texture_manager.get_texture(sprite.texture) {
+                    if let Some(texture) = self.texture_manager.get_texture(&sprite.texture) {
                         for stripe in draw_start_x..draw_end_x {
                             if transform_y < self.z_buffer[stripe] {
                                 let tex_x = ((stripe as f32 - (sprite_screen_x - sprite_width / 2.0)) * texture.width as f32 / sprite_width) as u32;
