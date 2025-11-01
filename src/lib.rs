@@ -9,7 +9,7 @@ pub const PORT: u16 = 8080;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ClientMessage {
-    Connect,
+    Connect(String),
     Input(Input),
 }
 

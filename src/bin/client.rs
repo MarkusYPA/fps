@@ -13,7 +13,8 @@ use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
-    ClientMessage, GameState, HEIGHT, Input, PORT, ServerMessage, WIDTH, renderer::Renderer, textures::TextureManager,
+    ClientMessage, GameState, HEIGHT, Input, PORT, ServerMessage, WIDTH, renderer::Renderer,
+    textures::TextureManager,
 };
 
 const MOUSE_SPEED: f32 = 0.06;
@@ -28,7 +29,16 @@ fn main() -> Result<()> {
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.connect(server_address)?;
 
-    let connect_message = ClientMessage::Connect;
+    // Ask for a username and send it to the server as part of the connect message
+    println!("Enter a username:");
+    let mut username = String::new();
+    io::stdin().read_line(&mut username)?;
+    let username = username.trim().to_string();
+
+    if username.is_empty() {
+        return Err(anyhow::anyhow!("Username cannot be empty"));
+    }
+    let connect_message = ClientMessage::Connect(username);
     let encoded_connect_message = bincode::serialize(&connect_message).unwrap();
     socket.send(&encoded_connect_message)?;
 

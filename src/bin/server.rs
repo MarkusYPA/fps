@@ -1,4 +1,4 @@
-use fps::{ClientMessage, GameState, Player, PlayerUpdate, ServerMessage, Welcome, PORT};
+use fps::{ClientMessage, GameState, PORT, Player, PlayerUpdate, ServerMessage, Welcome};
 use local_ip_address::local_ip;
 use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
@@ -11,6 +11,7 @@ fn main() -> std::io::Result<()> {
 
     let mut game_state = GameState::new();
     let mut clients = HashMap::<SocketAddr, u64>::new();
+    let mut client_usernames = HashMap::<u64, String>::new();
     let mut client_inputs = HashMap::<u64, fps::Input>::new();
     let mut next_id: u64 = 0;
 
@@ -30,10 +31,11 @@ fn main() -> std::io::Result<()> {
                     let client_message: ClientMessage = bincode::deserialize(&buf[..amt]).unwrap();
 
                     match client_message {
-                        ClientMessage::Connect => {
+                        ClientMessage::Connect(username) => {
                             if !clients.contains_key(&src) {
-                                println!("New client connected: {}", src);
+                                println!("New client connected: {} (username: {})", src, username);
                                 clients.insert(src, next_id);
+                                client_usernames.insert(next_id, username.clone());
 
                                 let welcome = Welcome { id: next_id };
                                 let encoded_welcome = bincode::serialize(&ServerMessage::Welcome(welcome)).unwrap();
@@ -93,11 +95,11 @@ fn main() -> std::io::Result<()> {
             let mut player_updates = HashMap::new();
             for (id, player) in &game_state.players {
                 player_updates.insert(id.clone(), PlayerUpdate {
-                    x: player.x,
-                    y: player.y,
-                    z: player.z,
-                    angle: player.angle,
-                    pitch: player.pitch,
+                        x: player.x,
+                        y: player.y,
+                        z: player.z,
+                        angle: player.angle,
+                        pitch: player.pitch,
                 });
             }
 
