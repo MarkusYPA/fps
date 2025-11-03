@@ -46,6 +46,17 @@ fn main() -> std::io::Result<()> {
                                     );
                                     let encoded_rejection = bincode::serialize(&rejection).unwrap();
                                     socket.send_to(&encoded_rejection, src)?;
+                                } else if username.is_empty() {
+                                    println!(
+                                        "Rejected connection from {} — username '{}' is empty.",
+                                        src, username
+                                    );
+
+                                    let rejection = ServerMessage::UsernameRejected(
+                                        "Empty username".to_string(),
+                                    );
+                                    let encoded_rejection = bincode::serialize(&rejection).unwrap();
+                                    socket.send_to(&encoded_rejection, src)?;
                                 } else {
                                     println!(
                                         "New client connected: {} (username: {})",

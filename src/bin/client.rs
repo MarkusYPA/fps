@@ -31,7 +31,6 @@ fn main() -> Result<()> {
     socket.set_nonblocking(true)?;
 
     let mut buf = [0; 1024];
-    //let mut my_id: u64;
     let mut my_id: Option<u64> = None;
 
     // Outer loop: continue until successfully connected
@@ -41,11 +40,6 @@ fn main() -> Result<()> {
         let mut username = String::new();
         io::stdin().read_line(&mut username)?;
         let username = username.trim().to_string();
-
-        if username.is_empty() {
-            eprintln!("Username cannot be empty.");
-            continue;
-        }
 
         // Send connect message
         let connect_message = ClientMessage::Connect(username.clone());
@@ -64,14 +58,13 @@ fn main() -> Result<()> {
                         match server_message {
                             ServerMessage::Welcome(welcome) => {
                                 println!("Connected to server with id: {}", welcome.id);
-                                //my_id = welcome.id;
                                 my_id = Some(welcome.id);
                                 got_response = true;
                                 break;
                             }
                             ServerMessage::UsernameRejected(reason) => {
                                 eprintln!("Connection rejected: {}", reason);
-                                // Re-prompt for a new username
+                                // prompt for a new username
                                 got_response = true;
                                 break;
                             }
@@ -87,11 +80,6 @@ fn main() -> Result<()> {
                     return Err(e.into());
                 }
             }
-
-            // Optionally resend connect request every 500 ms
-            if start.elapsed().as_millis() % 500 == 0 {
-                socket.send(&encoded)?;
-            }
         }
 
         if got_response {
@@ -99,7 +87,7 @@ fn main() -> Result<()> {
             if let Ok(ServerMessage::Welcome(_)) = bincode::deserialize::<ServerMessage>(&buf[..]) {
                 break;
             } else {
-                continue; // username rejected → ask again
+                continue; // username rejected, ask again
             }
         } else {
             eprintln!("No response from server, retrying...");
@@ -107,10 +95,6 @@ fn main() -> Result<()> {
     }
 
     let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
-
-    println!("✅ Connection established! Client ID assigned: {}", my_id);
-
-    // This far
 
     let event_loop = EventLoop::new()?;
     let mut input = WinitInputHelper::new();
