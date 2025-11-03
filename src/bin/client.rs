@@ -1,5 +1,5 @@
 use anyhow::Result;
-use std::io;
+use std::io::{self, Write};
 use std::net::UdpSocket;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -27,57 +27,90 @@ fn main() -> Result<()> {
     let server_address = format!("{}:{}", ip_only, PORT);
 
     let socket = UdpSocket::bind("0.0.0.0:0")?;
-    socket.connect(server_address)?;
-
-    // Ask for a username and send it to the server as part of the connect message
-    println!("Enter a username:");
-    let mut username = String::new();
-    io::stdin().read_line(&mut username)?;
-    let username = username.trim().to_string();
-
-    if username.is_empty() {
-        return Err(anyhow::anyhow!("Username cannot be empty"));
-    }
-    let connect_message = ClientMessage::Connect(username);
-    let encoded_connect_message = bincode::serialize(&connect_message).unwrap();
-    socket.send(&encoded_connect_message)?;
-
+    socket.connect(&server_address)?;
     socket.set_nonblocking(true)?;
 
     let mut buf = [0; 1024];
+    //let mut my_id: u64;
     let mut my_id: Option<u64> = None;
 
-    // Loop to receive the Welcome message with a timeout
-    for _ in 0..100 {
-        // Try 100 times, with a small delay
-        match socket.recv_from(&mut buf) {
-            Ok((amt, _)) => {
-                if let Ok(server_message) = bincode::deserialize::<ServerMessage>(&buf[..amt]) {
-                    match server_message {
-                        ServerMessage::Welcome(welcome) => {
-                            my_id = Some(welcome.id);
-                            println!("Connected to server with id: {}", welcome.id);
-                            break;
+    // Outer loop: continue until successfully connected
+    loop {
+        print!("Enter a username: ");
+        io::stdout().flush()?; // ensure prompt is printed
+        let mut username = String::new();
+        io::stdin().read_line(&mut username)?;
+        let username = username.trim().to_string();
+
+        if username.is_empty() {
+            eprintln!("Username cannot be empty.");
+            continue;
+        }
+
+        // Send connect message
+        let connect_message = ClientMessage::Connect(username.clone());
+        let encoded = bincode::serialize(&connect_message)?;
+        socket.send(&encoded)?;
+
+        // Wait for a response with timeout
+        let start = Instant::now();
+        let timeout = Duration::from_secs(2);
+        let mut got_response = false;
+
+        while start.elapsed() < timeout {
+            match socket.recv_from(&mut buf) {
+                Ok((amt, _)) => {
+                    if let Ok(server_message) = bincode::deserialize::<ServerMessage>(&buf[..amt]) {
+                        match server_message {
+                            ServerMessage::Welcome(welcome) => {
+                                println!("Connected to server with id: {}", welcome.id);
+                                //my_id = welcome.id;
+                                my_id = Some(welcome.id);
+                                got_response = true;
+                                break;
+                            }
+                            ServerMessage::UsernameRejected(reason) => {
+                                eprintln!("Connection rejected: {}", reason);
+                                // Re-prompt for a new username
+                                got_response = true;
+                                break;
+                            }
+                            _ => {}
                         }
-                        ServerMessage::UsernameRejected(reason) => {
-                            eprintln!("Connection rejected: {}", reason);
-                            return Err(io::Error::new(io::ErrorKind::Other, reason).into());
-                        }
-                        _ => {}
                     }
                 }
+                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                Err(e) => {
+                    eprintln!("Error receiving message: {}", e);
+                    return Err(e.into());
+                }
             }
-            Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                std::thread::sleep(std::time::Duration::from_millis(10));
+
+            // Optionally resend connect request every 500 ms
+            if start.elapsed().as_millis() % 500 == 0 {
+                socket.send(&encoded)?;
             }
-            Err(e) => {
-                eprintln!("Error receiving welcome message: {}", e);
-                return Err(e.into());
+        }
+
+        if got_response {
+            // If we connected successfully, exit loop
+            if let Ok(ServerMessage::Welcome(_)) = bincode::deserialize::<ServerMessage>(&buf[..]) {
+                break;
+            } else {
+                continue; // username rejected → ask again
             }
+        } else {
+            eprintln!("No response from server, retrying...");
         }
     }
 
     let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
+
+    println!("✅ Connection established! Client ID assigned: {}", my_id);
+
+    // This far
 
     let event_loop = EventLoop::new()?;
     let mut input = WinitInputHelper::new();
