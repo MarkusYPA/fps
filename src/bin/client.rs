@@ -53,10 +53,17 @@ fn main() -> Result<()> {
         match socket.recv_from(&mut buf) {
             Ok((amt, _)) => {
                 if let Ok(server_message) = bincode::deserialize::<ServerMessage>(&buf[..amt]) {
-                    if let ServerMessage::Welcome(welcome) = server_message {
-                        my_id = Some(welcome.id);
-                        println!("Connected to server with id: {}", welcome.id);
-                        break;
+                    match server_message {
+                        ServerMessage::Welcome(welcome) => {
+                            my_id = Some(welcome.id);
+                            println!("Connected to server with id: {}", welcome.id);
+                            break;
+                        }
+                        ServerMessage::UsernameRejected(reason) => {
+                            eprintln!("Connection rejected: {}", reason);
+                            return Err(io::Error::new(io::ErrorKind::Other, reason).into());
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -209,6 +216,7 @@ fn main() -> Result<()> {
                                     }
                                 }
                             }
+                            _ => {}
                         }
                     }
                 }

@@ -18,7 +18,9 @@ pub enum ServerMessage {
     Welcome(Welcome),
     GameUpdate(std::collections::HashMap<String, PlayerUpdate>),
     InitialState(GameState),
+    UsernameRejected(String),
 }
+
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Welcome {
