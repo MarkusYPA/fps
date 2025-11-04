@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-pub mod renderer;
 pub mod minimap;
+pub mod renderer;
 pub mod textures;
 
 pub const WIDTH: usize = 1024;
@@ -21,7 +21,6 @@ pub enum ServerMessage {
     InitialState(GameState),
     UsernameRejected(String),
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Welcome {
@@ -126,26 +125,78 @@ impl Player {
 
         self.angle += input.turn * self.rot_speed;
         self.pitch = (self.pitch + input.pitch * self.rot_speed * 2.0).clamp(
-            -std::f32::consts::PI / 2.5,  // restrict pitch angle
+            -std::f32::consts::PI / 2.5, // restrict pitch angle
             std::f32::consts::PI / 2.5,
         );
     }
 
+    // Verbose but fast function that avoids heap allocation, vector creation and branching
     fn check_collision_and_move(&mut self, new_x: f32, new_y: f32, world: &World) {
         let radius = 0.125;
         let dx = new_x - self.x;
         let dy = new_y - self.y;
-    
-        let check_x = self.x + dx + radius * dx.signum();
-        let check_y = self.y + dy + radius * dy.signum();
-    
-        if world.get_tile(check_x as usize, check_y as usize) == 0 {
-            self.x = new_x;
-            self.y = new_y;
-        } else if world.get_tile(check_x as usize, self.y as usize) == 0 {
-            self.x = new_x;
-        } else if world.get_tile(self.x as usize, check_y as usize) == 0 {
-            self.y = new_y;
+
+        let mut clear_x = true;
+        let mut clear_y = true;
+
+        // --- Horizontal movement ---
+        if dx < 0.0 {
+            // Moving left: check left-side corners
+            let cx = new_x - radius;
+            let top_y = self.y + radius;
+            let bottom_y = self.y - radius;
+
+            if world.get_tile(cx.floor() as usize, top_y.floor() as usize) != 0
+                || world.get_tile(cx.floor() as usize, bottom_y.floor() as usize) != 0
+            {
+                clear_x = false;
+            }
+        } else if dx > 0.0 {
+            // Moving right: check right-side corners
+            let cx = new_x + radius;
+            let top_y = self.y + radius;
+            let bottom_y = self.y - radius;
+
+            if world.get_tile(cx.floor() as usize, top_y.floor() as usize) != 0
+                || world.get_tile(cx.floor() as usize, bottom_y.floor() as usize) != 0
+            {
+                clear_x = false;
+            }
+        }
+
+        // --- Vertical movement ---
+        if dy < 0.0 {
+            // Moving down: check bottom corners
+            let cy = new_y - radius;
+            let left_x = self.x - radius;
+            let right_x = self.x + radius;
+
+            if world.get_tile(left_x.floor() as usize, cy.floor() as usize) != 0
+                || world.get_tile(right_x.floor() as usize, cy.floor() as usize) != 0
+            {
+                clear_y = false;
+            }
+        } else if dy > 0.0 {
+            // Moving up: check top corners
+            let cy = new_y + radius;
+            let left_x = self.x - radius;
+            let right_x = self.x + radius;
+
+            if world.get_tile(left_x.floor() as usize, cy.floor() as usize) != 0
+                || world.get_tile(right_x.floor() as usize, cy.floor() as usize) != 0
+            {
+                clear_y = false;
+            }
+        }
+
+        // --- Apply movement ---
+        if clear_x {
+            //self.x = new_x;
+            self.x += dx;
+        }
+        if clear_y {
+            //self.y = new_y;
+            self.y += dy;
         }
     }
 }
@@ -159,33 +210,82 @@ impl World {
     pub fn new() -> Self {
         World {
             map: vec![
-    vec![1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-    vec![1,0,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,0,0,1],
-    vec![1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    vec![1,0,0,1,0,1,0,1,0,1,1,1,0,1,1,1,0,1,0,1,0,1,0,0,1],
-    vec![1,1,0,0,0,1,0,0,0,1,0,1,0,0,0,1,0,0,0,1,0,0,0,1,1],
-    vec![1,0,0,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,0,1,0,1,0,0,1],
-    vec![1,1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0,0,0,1,0,0,0,1,1],
-    vec![1,0,0,1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,1,1,1,1,0,0,1],
-    vec![1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    vec![1,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,0,1],
-    vec![1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    vec![1,0,0,1,1,1,1,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,0,0,1],
-    vec![1,1,0,1,0,1,0,1,0,1,0,0,0,1,0,1,0,0,0,0,0,1,0,1,1],
-    vec![1,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,0,0,1],
-    vec![1,1,0,1,0,1,0,1,0,1,0,0,0,1,0,1,0,0,0,1,0,0,0,1,1],
-    vec![1,0,0,1,0,1,0,1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,0,0,1],
-    vec![1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    vec![1,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,1,1,0,0,1],
-    vec![1,1,0,1,0,1,0,1,0,1,0,0,0,1,0,1,0,0,0,1,0,0,0,1,1],
-    vec![1,0,0,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1,0,1,1,1,0,0,1],
-    vec![1,1,0,1,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,1,0,0,0,1,1],
-    vec![1,0,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1,0,1,1,1,0,0,1],
-    vec![1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    vec![1,1,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,1,1],
-    vec![1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
-],
-
+                vec![
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                ],
+                vec![
+                    1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1,
+                ],
+                vec![
+                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                ],
+                vec![
+                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1,
+                ],
+                vec![
+                    1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1,
+                ],
+                vec![
+                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1,
+                ],
+                vec![
+                    1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1,
+                ],
+                vec![
+                    1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1,
+                ],
+                vec![
+                    1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+                ],
+                vec![
+                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1,
+                ],
+                vec![
+                    1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+                ],
+                vec![
+                    1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1,
+                ],
+                vec![
+                    1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1,
+                ],
+                vec![
+                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1,
+                ],
+                vec![
+                    1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1,
+                ],
+                vec![
+                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1,
+                ],
+                vec![
+                    1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+                ],
+                vec![
+                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1,
+                ],
+                vec![
+                    1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1,
+                ],
+                vec![
+                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1,
+                ],
+                vec![
+                    1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1,
+                ],
+                vec![
+                    1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1,
+                ],
+                vec![
+                    1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+                ],
+                vec![
+                    1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1,
+                ],
+                vec![
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                ],
+            ],
         }
     }
 
@@ -213,9 +313,23 @@ impl GameState {
             players: HashMap::new(),
             world: World::new(),
             sprites: vec![
-                Sprite { x: 3.2, y: 4.3, z: 0.0, texture: "character2".to_string(), width: 0.2, height: 0.65 },
-                Sprite { x: 4.2, y: 4.3, z: 0.0, texture: "character3".to_string(), width: 0.2, height: 0.65 },
-            ]
+                Sprite {
+                    x: 3.2,
+                    y: 4.3,
+                    z: 0.0,
+                    texture: "character2".to_string(),
+                    width: 0.2,
+                    height: 0.65,
+                },
+                Sprite {
+                    x: 4.2,
+                    y: 4.3,
+                    z: 0.0,
+                    texture: "character3".to_string(),
+                    width: 0.2,
+                    height: 0.65,
+                },
+            ],
         }
     }
 
