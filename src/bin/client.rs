@@ -132,6 +132,7 @@ fn main() -> Result<()> {
     let mut mouse_dx = 0.0;
     let mut mouse_dy = 0.0;
     let mut prev_input: Option<Input> = None;
+    let mut focused = false;
 
     Ok(event_loop.run(move |event, elwt| {
         match &event {
@@ -139,7 +140,7 @@ fn main() -> Result<()> {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
-                if cursor_grabbed {
+                if cursor_grabbed && focused {
                     mouse_dx = delta.0 as f32;
                     mouse_dy = delta.1 as f32;
                 }
@@ -148,6 +149,9 @@ fn main() -> Result<()> {
                 WindowEvent::CloseRequested => {
                     elwt.exit();
                     return;
+                }
+                WindowEvent::Focused(is_focused) => {
+                    focused = *is_focused;
                 }
                 WindowEvent::RedrawRequested => {
                     if let Some(ref gs) = game_state {
