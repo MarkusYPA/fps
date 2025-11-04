@@ -9,7 +9,7 @@ use winit::dpi::LogicalSize;
 use winit::event::{DeviceEvent, Event, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
-use winit::window::WindowBuilder;
+use winit::window::{CursorGrabMode, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
@@ -107,10 +107,11 @@ fn main() -> Result<()> {
             .build(&event_loop)?
     });
 
+    let mut cursor_grabbed = true;
     window.set_cursor_visible(false);
     window
-        .set_cursor_grab(winit::window::CursorGrabMode::Confined)
-        .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
+        .set_cursor_grab(CursorGrabMode::Confined)
+        .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
         .unwrap();
 
     let mut pixels = {
@@ -138,8 +139,10 @@ fn main() -> Result<()> {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
-                mouse_dx = delta.0 as f32;
-                mouse_dy = delta.1 as f32;
+                if cursor_grabbed {
+                    mouse_dx = delta.0 as f32;
+                    mouse_dy = delta.1 as f32;
+                }
             }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
@@ -174,6 +177,26 @@ fn main() -> Result<()> {
             if input.key_pressed(KeyCode::Escape) || input.close_requested() {
                 elwt.exit();
                 return;
+            }
+
+            if input.key_pressed(KeyCode::Tab) {
+                cursor_grabbed = !cursor_grabbed;
+                window_clone.set_cursor_visible(!cursor_grabbed);
+                let grab_mode = if cursor_grabbed {
+                    CursorGrabMode::Confined
+                } else {
+                    CursorGrabMode::None
+                };
+                window_clone
+                    .set_cursor_grab(grab_mode)
+                    .or_else(|_e| {
+                        if cursor_grabbed {
+                            window_clone.set_cursor_grab(CursorGrabMode::Locked)
+                        } else {
+                            window_clone.set_cursor_grab(CursorGrabMode::None)
+                        }
+                    })
+                    .unwrap();
             }
 
             let mut turn = mouse_dx * MOUSE_SPEED;
