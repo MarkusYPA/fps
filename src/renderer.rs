@@ -257,30 +257,35 @@ impl Renderer {
     }
 
     /// Draw a line between two points (simple Bresenham-ish approach)
-    fn draw_line(&mut self, x0: usize, y0: usize, x1: usize, y1: usize, color: u32) {
-        let dx = (x1 as i32 - x0 as i32).abs();
-        let dy = (y1 as i32 - y0 as i32).abs();
-        let sx = if x1 as i32 > x0 as i32 { 1 } else { -1 };
-        let sy = if y1 as i32 > y0 as i32 { 1 } else { -1 };
-        let mut err = (dx - dy) / 2;
-        let mut x = x0 as i32;
-        let mut y = y0 as i32;
-        let max_steps = (dx + dy + 1) as usize + 10; // Safety limit to prevent infinite loops
-        let mut step_count = 0;
+    fn draw_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: u32) {
+        // Bresenham's line algorithm with i32 coords and clipping checks.
+        let dx = (x1 - x0).abs();
+        let dy = (y1 - y0).abs();
+        let sx = if x1 > x0 { 1 } else { -1 };
+        let sy = if y1 > y0 { 1 } else { -1 };
+        let mut err = dx - dy;
+        let mut x = x0;
+        let mut y = y0;
+
+        // Safety limit to prevent infinite loops in degenerate cases
+        let max_steps = (dx as i64 + dy as i64 + 1) as usize + 100;
+        let mut step_count = 0usize;
 
         loop {
             if step_count > max_steps {
-                break; // Safety check to prevent infinite loops
+                break;
             }
             step_count += 1;
 
             if x >= 0 && x < WIDTH as i32 && y >= 0 && y < HEIGHT as i32 {
                 self.buffer[y as usize * WIDTH + x as usize] = color;
             }
-            if x == x1 as i32 && y == y1 as i32 {
+
+            if x == x1 && y == y1 {
                 break;
             }
-            let e2 = 2 * err;
+
+            let e2 = err * 2;
             if e2 > -dy {
                 err -= dy;
                 x += sx;
@@ -327,8 +332,20 @@ impl Renderer {
                 self.fill_rect(px, py, tile_size, tile_size, tile_color);
 
                 // Draw grid lines
-                self.draw_line(px, py, px + tile_size, py, 0x00222222);
-                self.draw_line(px, py, px, py + tile_size, 0x00222222);
+                self.draw_line(
+                    px as i32,
+                    py as i32,
+                    (px + tile_size) as i32,
+                    py as i32,
+                    0x00222222,
+                );
+                self.draw_line(
+                    px as i32,
+                    py as i32,
+                    px as i32,
+                    (py + tile_size) as i32,
+                    0x00222222,
+                );
             }
         }
 
@@ -348,7 +365,7 @@ impl Renderer {
 
             // Triangle dimensions: tip longer, base shorter
             let tip_len = 12.0;
-            let base_len = 6.0;
+            let base_len = 4.0;
 
             // Calculate triangle points
             let tip_x = (px as f32 + player.angle.cos() * tip_len) as i32;
@@ -365,58 +382,57 @@ impl Renderer {
             let right_y = (py as f32 + right_angle.sin() * base_len) as i32;
 
             // Draw filled triangle (3 lines forming outline)
-            if tip_x >= 0 && tip_x < WIDTH as i32 && tip_y >= 0 && tip_y < HEIGHT as i32 {
-                self.draw_line(
-                    tip_x as usize,
-                    tip_y as usize,
-                    left_x as usize,
-                    left_y as usize,
-                    0x00FF0000,
-                );
-                self.draw_line(
-                    left_x as usize,
-                    left_y as usize,
-                    right_x as usize,
-                    right_y as usize,
-                    0x00FF0000,
-                );
-                self.draw_line(
-                    right_x as usize,
-                    right_y as usize,
-                    tip_x as usize,
-                    tip_y as usize,
-                    0x00FF0000,
-                );
-            }
+            // We rely on draw_line's clipping; call unconditionally with i32 coords.
+            self.draw_line(
+                tip_x as i32,
+                tip_y as i32,
+                left_x as i32,
+                left_y as i32,
+                0x00FF0000,
+            );
+            self.draw_line(
+                left_x as i32,
+                left_y as i32,
+                right_x as i32,
+                right_y as i32,
+                0x00FF0000,
+            );
+            self.draw_line(
+                right_x as i32,
+                right_y as i32,
+                tip_x as i32,
+                tip_y as i32,
+                0x00FF0000,
+            );
         }
 
         // Draw minimap border
         self.draw_line(
-            start_x,
-            start_y,
-            start_x + minimap_width,
-            start_y,
+            start_x as i32,
+            start_y as i32,
+            (start_x + minimap_width) as i32,
+            start_y as i32,
             0x00FFFFFF,
         );
         self.draw_line(
-            start_x + minimap_width,
-            start_y,
-            start_x + minimap_width,
-            start_y + minimap_height,
+            (start_x + minimap_width) as i32,
+            start_y as i32,
+            (start_x + minimap_width) as i32,
+            (start_y + minimap_height) as i32,
             0x00FFFFFF,
         );
         self.draw_line(
-            start_x + minimap_width,
-            start_y + minimap_height,
-            start_x,
-            start_y + minimap_height,
+            (start_x + minimap_width) as i32,
+            (start_y + minimap_height) as i32,
+            start_x as i32,
+            (start_y + minimap_height) as i32,
             0x00FFFFFF,
         );
         self.draw_line(
-            start_x,
-            start_y + minimap_height,
-            start_x,
-            start_y,
+            start_x as i32,
+            (start_y + minimap_height) as i32,
+            start_x as i32,
+            start_y as i32,
             0x00FFFFFF,
         );
     }
