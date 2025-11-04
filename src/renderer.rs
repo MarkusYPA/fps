@@ -358,67 +358,52 @@ impl Renderer {
             }
         }
 
-        // Draw own player's indicator using a navigator PNG (centered on camera tip)
+        // Draw own player's indicator using a navigator PNG
         if let Some(player) = game_state.players.get(&my_id.to_string()) {
-            // small forward offset in world units so icon aligns with camera sampling point
-            let forward_offset = 0.2_f32;
-            let cam_x = player.x + player.angle.cos() * forward_offset;
-            let cam_y = player.y + player.angle.sin() * forward_offset;
-
-            // map camera world coords to minimap pixels (floating)
-            let center_px_f = start_x as f32 + cam_x * tile_size as f32;
-            let center_py_f = start_y as f32 + cam_y * tile_size as f32;
-
             if let Some(tex) = self.texture_manager.get_texture("navigator") {
-                // desired icon size on the minimap (pixels)
-                let icon_w = 18i32;
-                let icon_h = 18i32;
-                let half_w = icon_w / 2;
-                let half_h = icon_h / 2;
+                let icon_size = 12.0;
+                let (icon_w, icon_h) = (icon_size as i32, icon_size as i32);
+                let (half_w, half_h) = (icon_w / 2, icon_h / 2);
 
-                // scaling from dest icon size -> source texture pixels
-                let scale_x = tex.width as f32 / icon_w as f32;
-                let scale_y = tex.height as f32 / icon_h as f32;
+                let center_px = start_x as f32 + player.x * tile_size as f32;
+                let center_py = start_y as f32 + player.y * tile_size as f32;
 
-                // rotation: simplified rotation equivalent to the previous -PI/2 - PI
-                // (player.angle - PI/2 - PI) == (player.angle + PI/2) mod 2PI
-                let angle = player.angle + std::f32::consts::FRAC_PI_2;
-                let sa = angle.sin();
-                let ca = angle.cos();
-
-                // precompute texture center and half sizes as floats
                 let tex_cx = tex.width as f32 * 0.5;
                 let tex_cy = tex.height as f32 * 0.5;
-                let half_w_f = half_w as f32;
-                let half_h_f = half_h as f32;
+                let scale_x = tex.width as f32 / icon_size;
+                let scale_y = tex.height as f32 / icon_size;
 
-                for dy in 0..icon_h {
-                    let dst_y = (center_py_f as i32) + (dy - half_h);
+                // simplified rotation formula (equivalent to +PI/2)
+                let angle = player.angle + std::f32::consts::FRAC_PI_2;
+                let (sin_a, cos_a) = angle.sin_cos();
+
+                for dy in -half_h..half_h {
+                    let dst_y = center_py as i32 + dy;
                     if dst_y < start_y as i32 || dst_y >= (start_y + minimap_height) as i32 {
                         continue;
                     }
-                    for dx in 0..icon_w {
-                        let dst_x = (center_px_f as i32) + (dx - half_w);
+
+                    for dx in -half_w..half_w {
+                        let dst_x = center_px as i32 + dx;
                         if dst_x < start_x as i32 || dst_x >= (start_x + minimap_width) as i32 {
                             continue;
                         }
 
-                        // coordinate in dest icon space centered at (0,0)
-                        let ox = (dx as f32 - half_w_f) * scale_x;
-                        let oy = (dy as f32 - half_h_f) * scale_y;
+                        // Rotate and scale
+                        let src_x = ((dx as f32) * scale_x) * cos_a
+                            + ((dy as f32) * scale_y) * sin_a
+                            + tex_cx;
+                        let src_y = -((dx as f32) * scale_x) * sin_a
+                            + ((dy as f32) * scale_y) * cos_a
+                            + tex_cy;
 
-                        // inverse rotate (rotate by -angle) to sample from source texture
-                        let src_xf = ox * ca + oy * sa + tex_cx;
-                        let src_yf = -ox * sa + oy * ca + tex_cy;
-
-                        let sx = src_xf.floor() as i32;
-                        let sy = src_yf.floor() as i32;
+                        let sx = src_x as i32;
+                        let sy = src_y as i32;
 
                         if sx >= 0 && sy >= 0 && (sx as u32) < tex.width && (sy as u32) < tex.height
                         {
                             let color = tex.pixels[(sy as u32 * tex.width + sx as u32) as usize];
-                            let alpha = (color >> 24) & 0xFF;
-                            if alpha > 0 {
+                            if (color >> 24) & 0xFF > 0 {
                                 self.buffer[dst_y as usize * WIDTH + dst_x as usize] = color;
                             }
                         }
