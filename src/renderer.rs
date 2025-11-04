@@ -358,52 +358,70 @@ impl Renderer {
             }
         }
 
-        // Draw own player's direction indicator (solid triangle pointing in view direction)
+        // Draw own player's indicator using a navigator PNG (centered on camera tip)
         if let Some(player) = game_state.players.get(&my_id.to_string()) {
-            let px = start_x as i32 + (player.x * tile_size as f32) as i32;
-            let py = start_y as i32 + (player.y * tile_size as f32) as i32;
+            // small forward offset in world units so icon aligns with camera sampling point
+            let forward_offset = 0.2_f32;
+            let cam_x = player.x + player.angle.cos() * forward_offset;
+            let cam_y = player.y + player.angle.sin() * forward_offset;
 
-            // Triangle dimensions: tip longer, base shorter
-            let tip_len = 12.0;
-            let base_len = 4.0;
+            // map camera world coords to minimap pixels (floating)
+            let center_px_f = start_x as f32 + cam_x * tile_size as f32;
+            let center_py_f = start_y as f32 + cam_y * tile_size as f32;
 
-            // Calculate triangle points
-            let tip_x = (px as f32 + player.angle.cos() * tip_len) as i32;
-            let tip_y = (py as f32 + player.angle.sin() * tip_len) as i32;
+            if let Some(tex) = self.texture_manager.get_texture("navigator") {
+                // desired icon size on the minimap (pixels)
+                let icon_w = 18i32;
+                let icon_h = 18i32;
+                let half_w = icon_w / 2;
+                let half_h = icon_h / 2;
 
-            // Left point (90 degrees left from forward direction)
-            let left_angle = player.angle + std::f32::consts::PI / 2.0;
-            let left_x = (px as f32 + left_angle.cos() * base_len) as i32;
-            let left_y = (py as f32 + left_angle.sin() * base_len) as i32;
+                // scaling from dest icon size -> source texture pixels
+                let scale_x = tex.width as f32 / icon_w as f32;
+                let scale_y = tex.height as f32 / icon_h as f32;
 
-            // Right point (90 degrees right from forward direction)
-            let right_angle = player.angle - std::f32::consts::PI / 2.0;
-            let right_x = (px as f32 + right_angle.cos() * base_len) as i32;
-            let right_y = (py as f32 + right_angle.sin() * base_len) as i32;
+                // rotation: rotate the icon so it points at player.angle but rotated
+                // 90 degrees clockwise + additional 180 degrees as requested
+                let angle = player.angle - std::f32::consts::FRAC_PI_2 - std::f32::consts::PI;
+                let sa = angle.sin();
+                let ca = angle.cos();
 
-            // Draw filled triangle (3 lines forming outline)
-            // We rely on draw_line's clipping; call unconditionally with i32 coords.
-            self.draw_line(
-                tip_x as i32,
-                tip_y as i32,
-                left_x as i32,
-                left_y as i32,
-                0x00FF0000,
-            );
-            self.draw_line(
-                left_x as i32,
-                left_y as i32,
-                right_x as i32,
-                right_y as i32,
-                0x00FF0000,
-            );
-            self.draw_line(
-                right_x as i32,
-                right_y as i32,
-                tip_x as i32,
-                tip_y as i32,
-                0x00FF0000,
-            );
+                let half_w_f = half_w as f32;
+                let half_h_f = half_h as f32;
+
+                for dy in 0..icon_h {
+                    let dst_y = (center_py_f as i32) + (dy - half_h);
+                    if dst_y < start_y as i32 || dst_y >= (start_y + minimap_height) as i32 {
+                        continue;
+                    }
+                    for dx in 0..icon_w {
+                        let dst_x = (center_px_f as i32) + (dx - half_w);
+                        if dst_x < start_x as i32 || dst_x >= (start_x + minimap_width) as i32 {
+                            continue;
+                        }
+
+                        // coordinate in dest icon space centered at (0,0)
+                        let ox = (dx as f32 - half_w_f) * scale_x;
+                        let oy = (dy as f32 - half_h_f) * scale_y;
+
+                        // inverse rotate (rotate by -angle) to sample from source texture
+                        let src_xf = ox * ca + oy * sa + (tex.width as f32 * 0.5);
+                        let src_yf = -ox * sa + oy * ca + (tex.height as f32 * 0.5);
+
+                        let sx = src_xf.floor() as i32;
+                        let sy = src_yf.floor() as i32;
+
+                        if sx >= 0 && sy >= 0 && (sx as u32) < tex.width && (sy as u32) < tex.height
+                        {
+                            let color = tex.pixels[(sy as u32 * tex.width + sx as u32) as usize];
+                            let alpha = (color >> 24) & 0xFF;
+                            if alpha > 0 {
+                                self.buffer[dst_y as usize * WIDTH + dst_x as usize] = color;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Draw minimap border
