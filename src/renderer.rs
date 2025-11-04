@@ -127,8 +127,8 @@ impl Renderer {
                         y: other_player.y,
                         z: other_player.z,
                         texture: other_player.texture.clone(),
-                        width: 0.2, // You might want to adjust this
-                        height: 0.65, // You might want to adjust this
+                        width: 0.2,
+                        height: 0.65,
                     });
                 }
             }

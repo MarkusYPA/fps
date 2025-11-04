@@ -130,10 +130,19 @@ impl Player {
     }
 
     fn check_collision_and_move(&mut self, new_x: f32, new_y: f32, world: &World) {
-        if world.get_tile(new_x as usize, self.y as usize) == 0 {
+        let radius = 0.11;
+        let dx = new_x - self.x;
+        let dy = new_y - self.y;
+    
+        let check_x = self.x + dx + radius * dx.signum();
+        let check_y = self.y + dy + radius * dy.signum();
+    
+        if world.get_tile(check_x as usize, check_y as usize) == 0 {
             self.x = new_x;
-        }
-        if world.get_tile(self.x as usize, new_y as usize) == 0 {
+            self.y = new_y;
+        } else if world.get_tile(check_x as usize, self.y as usize) == 0 {
+            self.x = new_x;
+        } else if world.get_tile(self.x as usize, check_y as usize) == 0 {
             self.y = new_y;
         }
     }
