@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod renderer;
+pub mod minimap;
 pub mod textures;
 
 pub const WIDTH: usize = 1024;
