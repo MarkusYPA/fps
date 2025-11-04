@@ -380,12 +380,15 @@ impl Renderer {
                 let scale_x = tex.width as f32 / icon_w as f32;
                 let scale_y = tex.height as f32 / icon_h as f32;
 
-                // rotation: rotate the icon so it points at player.angle but rotated
-                // 90 degrees clockwise + additional 180 degrees as requested
-                let angle = player.angle - std::f32::consts::FRAC_PI_2 - std::f32::consts::PI;
+                // rotation: simplified rotation equivalent to the previous -PI/2 - PI
+                // (player.angle - PI/2 - PI) == (player.angle + PI/2) mod 2PI
+                let angle = player.angle + std::f32::consts::FRAC_PI_2;
                 let sa = angle.sin();
                 let ca = angle.cos();
 
+                // precompute texture center and half sizes as floats
+                let tex_cx = tex.width as f32 * 0.5;
+                let tex_cy = tex.height as f32 * 0.5;
                 let half_w_f = half_w as f32;
                 let half_h_f = half_h as f32;
 
@@ -405,8 +408,8 @@ impl Renderer {
                         let oy = (dy as f32 - half_h_f) * scale_y;
 
                         // inverse rotate (rotate by -angle) to sample from source texture
-                        let src_xf = ox * ca + oy * sa + (tex.width as f32 * 0.5);
-                        let src_yf = -ox * sa + oy * ca + (tex.height as f32 * 0.5);
+                        let src_xf = ox * ca + oy * sa + tex_cx;
+                        let src_yf = -ox * sa + oy * ca + tex_cy;
 
                         let sx = src_xf.floor() as i32;
                         let sy = src_yf.floor() as i32;
