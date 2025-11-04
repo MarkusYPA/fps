@@ -116,7 +116,7 @@ fn main() -> std::io::Result<()> {
             for player in game_state.players.values_mut() {
                 player.z += player.velocity_z;
                 if player.z > 0.0 {
-                    player.velocity_z -= 0.001;
+                    player.velocity_z -= 0.0012;
                 } else {
                     player.velocity_z = 0.0;
                     player.z = 0.0;

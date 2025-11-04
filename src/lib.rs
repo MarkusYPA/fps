@@ -319,7 +319,7 @@ impl GameState {
                     z: 0.0,
                     texture: "character2".to_string(),
                     width: 0.2,
-                    height: 0.65,
+                    height: 0.7,
                 },
                 Sprite {
                     x: 4.2,
@@ -327,7 +327,7 @@ impl GameState {
                     z: 0.0,
                     texture: "character3".to_string(),
                     width: 0.2,
-                    height: 0.65,
+                    height: 0.7,
                 },
             ],
         }

@@ -1,5 +1,7 @@
 use crate::{GameState, HEIGHT, Sprite, WIDTH, textures::TextureManager};
 
+const CAMERA_HEIGHT_OFFSET: f32 = 0.1;
+
 pub struct Renderer {
     pub buffer: Vec<u32>,
     pub z_buffer: Vec<f32>,
@@ -101,7 +103,8 @@ impl Renderer {
                 self.z_buffer[x] = perp_wall_dist;
 
                 let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-                let z_offset = (player.z * line_height as f32) as isize;
+                //let camera_height_offset = 0.1;
+                let z_offset = ((player.z + CAMERA_HEIGHT_OFFSET) * line_height as f32) as isize;
                 let draw_start = (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
                     .clamp(0, HEIGHT as isize - 1) as usize;
                 let draw_end = (line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
@@ -128,7 +131,7 @@ impl Renderer {
                         z: other_player.z,
                         texture: other_player.texture.clone(),
                         width: 0.2,
-                        height: 0.65,
+                        height: 0.7,
                     });
                 }
             }
@@ -167,9 +170,12 @@ impl Renderer {
 
                     let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite.height;
                     let world_half = (HEIGHT as f32 / transform_y).abs() * 0.5;
-                    let sprite_vertical_offset =
-                        (player.z - sprite.z) * HEIGHT as f32 / transform_y - sprite_height * 0.5
-                            + world_half;
+                    //let camera_height_offset = 0.1;
+                    let sprite_vertical_offset = (player.z + CAMERA_HEIGHT_OFFSET - sprite.z)
+                        * HEIGHT as f32
+                        / transform_y
+                        - sprite_height * 0.5
+                        + world_half;
 
                     let draw_start_y = (-sprite_height / 2.0
                         + HEIGHT as f32 / 2.0
