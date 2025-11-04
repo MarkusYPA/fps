@@ -13,7 +13,8 @@ use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
-    ClientMessage, GameState, HEIGHT, Input, PORT, ServerMessage, WIDTH, renderer::Renderer, textures::TextureManager,
+    ClientMessage, GameState, HEIGHT, Input, PORT, ServerMessage, WIDTH, renderer::Renderer,
+    textures::TextureManager,
 };
 
 const MOUSE_SPEED: f32 = 0.06;
@@ -195,6 +196,15 @@ fn main() -> Result<()> {
                                             player.z = update.z;
                                             player.angle = update.angle;
                                             player.pitch = update.pitch;
+                                        } else {
+                                            // New player joined — insert into local game state
+                                            let mut p = fps::Player::new();
+                                            p.x = update.x;
+                                            p.y = update.y;
+                                            p.z = update.z;
+                                            p.angle = update.angle;
+                                            p.pitch = update.pitch;
+                                            gs.players.insert(id, p);
                                         }
                                     }
                                 }

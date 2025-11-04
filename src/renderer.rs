@@ -354,7 +354,7 @@ impl Renderer {
             if id != &my_id.to_string() {
                 let px = start_x + (player.x * tile_size as f32) as usize;
                 let py = start_y + (player.y * tile_size as f32) as usize;
-                self.draw_circle(px, py, 3, 0x0000FF00); // Green: other players
+                self.draw_circle(px, py, 3, 0x00FF0000); // Red: other players
             }
         }
 
