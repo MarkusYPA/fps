@@ -33,6 +33,7 @@ pub struct PlayerUpdate {
     pub z: f32,
     pub angle: f32,
     pub pitch: f32,
+    pub texture: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -66,6 +67,7 @@ pub struct Player {
     pub velocity_z: f32,
     pub move_speed: f32,
     pub rot_speed: f32,
+    pub texture: String,
 }
 
 impl Player {
@@ -79,6 +81,7 @@ impl Player {
             velocity_z: 0.0,
             move_speed: 0.05,
             rot_speed: 0.03,
+            texture: "character4".to_string(),
         }
     }
 

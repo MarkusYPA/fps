@@ -35,7 +35,7 @@ fn main() -> Result<()> {
 
     socket.set_nonblocking(true)?;
 
-    let mut buf = [0; 1024];
+    let mut buf = [0; 2048];
     let mut my_id: Option<u64> = None;
 
     // Loop to receive the Welcome message with a timeout
@@ -173,7 +173,7 @@ fn main() -> Result<()> {
             }
         }
 
-        let mut buf = [0; 1024];
+        let mut buf = [0; 2048];
 
         loop {
             match socket.recv(&mut buf) {
@@ -196,6 +196,7 @@ fn main() -> Result<()> {
                                             player.z = update.z;
                                             player.angle = update.angle;
                                             player.pitch = update.pitch;
+                                            player.texture = update.texture;
                                         } else {
                                             // New player joined — insert into local game state
                                             let mut p = fps::Player::new();
@@ -204,6 +205,7 @@ fn main() -> Result<()> {
                                             p.z = update.z;
                                             p.angle = update.angle;
                                             p.pitch = update.pitch;
+                                            p.texture = update.texture;
                                             gs.players.insert(id, p);
                                         }
                                     }

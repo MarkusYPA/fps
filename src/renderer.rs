@@ -1,4 +1,4 @@
-use crate::{GameState, HEIGHT, WIDTH, textures::TextureManager};
+use crate::{GameState, HEIGHT, Sprite, WIDTH, textures::TextureManager};
 
 pub struct Renderer {
     pub buffer: Vec<u32>,
@@ -119,10 +119,22 @@ impl Renderer {
             }
 
             // Sprite rendering
+            let mut all_sprites = game_state.sprites.clone();
+            for (id, other_player) in &game_state.players {
+                if id != &my_id.to_string() {
+                    all_sprites.push(Sprite {
+                        x: other_player.x,
+                        y: other_player.y,
+                        z: other_player.z,
+                        texture: other_player.texture.clone(),
+                        width: 0.2, // You might want to adjust this
+                        height: 0.65, // You might want to adjust this
+                    });
+                }
+            }
 
             // Sort sprites by distance
-            let mut sprites_with_dist: Vec<_> = game_state
-                .sprites
+            let mut sprites_with_dist: Vec<_> = all_sprites
                 .iter()
                 .map(|sprite| {
                     let sprite_x = sprite.x - player.x;

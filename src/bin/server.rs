@@ -98,6 +98,7 @@ fn main() -> std::io::Result<()> {
                     z: player.z,
                     angle: player.angle,
                     pitch: player.pitch,
+                    texture: player.texture.clone(),
                 });
             }
 
