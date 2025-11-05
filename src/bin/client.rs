@@ -122,8 +122,9 @@ fn main() -> Result<()> {
 
     let mut texture_manager = TextureManager::new();
     fps::textures::load_game_textures(&mut texture_manager)?;
+    let sprite_sheet = fps::spritesheet::SpriteSheet::new("assets/rott-ianpaulfreeley.png")?;
 
-    let mut renderer = Renderer::new(texture_manager);
+    let mut renderer = Renderer::new(texture_manager, sprite_sheet);
     let mut game_state: Option<GameState> = None;
 
     let mut frame_count = 0;
@@ -133,8 +134,26 @@ fn main() -> Result<()> {
     let mut mouse_dy = 0.0;
     let mut prev_input: Option<Input> = None;
     let mut focused = false;
+    let mut last_frame_time = Instant::now();
 
     Ok(event_loop.run(move |event, elwt| {
+        let delta_time = last_frame_time.elapsed().as_secs_f32();
+        last_frame_time = Instant::now();
+
+        if let Some(gs) = &mut game_state {
+            for player in gs.players.values_mut() {
+                if player.animation_state == fps::AnimationState::Walking {
+                    player.frame_timer += delta_time;
+                    if player.frame_timer > 0.150 {
+                        player.frame_timer = 0.0;
+                        player.frame = (player.frame + 1) % 4;
+                    }
+                } else {
+                    player.frame = 0;
+                }
+            }
+        }
+
         match &event {
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta },
@@ -257,6 +276,8 @@ fn main() -> Result<()> {
                                             player.angle = update.angle;
                                             player.pitch = update.pitch;
                                             player.texture = update.texture;
+                                            player.animation_state = update.animation_state;
+                                            player.direction = update.direction;
                                         } else {
                                             // New player joined — insert into local game state
                                             let mut p = fps::Player::new();
@@ -266,7 +287,9 @@ fn main() -> Result<()> {
                                             p.angle = update.angle;
                                             p.pitch = update.pitch;
                                             p.texture = update.texture;
-                                            gs.players.insert(id, p);
+                                            p.animation_state = update.animation_state;
+                                            p.direction = update.direction;
+                                            gs.players.insert(id.clone(), p);
                                         }
                                     }
                                 }

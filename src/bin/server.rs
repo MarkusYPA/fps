@@ -124,7 +124,7 @@ fn main() -> std::io::Result<()> {
             }
 
             // Prepare and send game update to all clients
-            let mut player_updates = HashMap::new();
+            let mut player_updates = HashMap::<String, PlayerUpdate>::new();
             for (id, player) in &game_state.players {
                 player_updates.insert(
                     id.clone(),
@@ -135,7 +135,9 @@ fn main() -> std::io::Result<()> {
                         angle: player.angle,
                         pitch: player.pitch,
                         texture: player.texture.clone(),
-                },
+                        animation_state: player.animation_state.clone(),
+                        direction: player.direction.clone(),
+                    },
                 );
             }
 

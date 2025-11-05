@@ -1,19 +1,74 @@
-use crate::{GameState, HEIGHT, Sprite, WIDTH, textures::TextureManager};
+use crate::{
+    Direction, GameState, HEIGHT, Sprite, WIDTH, spritesheet::SpriteSheet, textures::TextureManager,
+};
 
 const CAMERA_HEIGHT_OFFSET: f32 = 0.1;
+
+fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
+    let mut angle_diff = (player_angle - camera_angle).to_degrees() + 180.0;
+    if angle_diff < 0.0 {
+        angle_diff += 360.0;
+    }
+    let direction_index = (angle_diff / 45.0).round() as usize % 8;
+
+    match direction_index {
+        0 => Direction::Front,
+        1 => Direction::FrontRight,
+        2 => Direction::Right,
+        3 => Direction::BackRight,
+        4 => Direction::Back,
+        5 => Direction::BackLeft,
+        6 => Direction::Left,
+        7 => Direction::FrontLeft,
+        _ => Direction::Front,
+    }
+}
 
 pub struct Renderer {
     pub buffer: Vec<u32>,
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
+    pub sprite_sheet: SpriteSheet,
+    pub sprites: Vec<Sprite>,
+}
+
+struct SpriteInfo<'a> {
+    x: f32,
+    y: f32,
+    z: f32,
+    texture: &'a String,
+    width: f32,
+    height: f32,
+    dist_sq: f32,
+    frame: Option<&'a crate::spritesheet::Frame>,
 }
 
 impl Renderer {
-    pub fn new(texture_manager: TextureManager) -> Self {
+    pub fn new(texture_manager: TextureManager, sprite_sheet: SpriteSheet) -> Self {
+        let sprites = vec![
+            Sprite {
+                x: 3.2,
+                y: 4.3,
+                z: 0.0,
+                texture: "character2".to_string(),
+                width: 0.2,
+                height: 0.7,
+            },
+            Sprite {
+                x: 4.2,
+                y: 4.3,
+                z: 0.0,
+                texture: "character3".to_string(),
+                width: 0.2,
+                height: 0.7,
+            },
+        ];
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT],
             z_buffer: vec![0.0; WIDTH],
             texture_manager,
+            sprite_sheet,
+            sprites,
         }
     }
 
@@ -121,37 +176,60 @@ impl Renderer {
                 }
             }
 
-            // Sprite rendering
-            let mut all_sprites = game_state.sprites.clone();
+            let mut sprite_infos: Vec<SpriteInfo> = self
+                .sprites
+                .iter()
+                .map(|s| {
+                    let sprite_x = s.x - player.x;
+                    let sprite_y = s.y - player.y;
+                    SpriteInfo {
+                        x: s.x,
+                        y: s.y,
+                        z: s.z,
+                        texture: &s.texture,
+                        width: s.width,
+                        height: s.height,
+                        dist_sq: sprite_x * sprite_x + sprite_y * sprite_y,
+                        frame: None,
+                    }
+                })
+                .collect();
+
             for (id, other_player) in &game_state.players {
                 if id != &my_id.to_string() {
-                    all_sprites.push(Sprite {
+                    let direction = get_direction(other_player.angle, player.angle);
+                    let frame = match other_player.animation_state {
+                        crate::AnimationState::Idle => &self.sprite_sheet.idle[direction as usize],
+                        crate::AnimationState::Walking => {
+                            &self.sprite_sheet.walk[direction as usize][other_player.frame]
+                        }
+                    };
+
+                    let sprite_x = other_player.x - player.x;
+                    let sprite_y = other_player.y - player.y;
+                    sprite_infos.push(SpriteInfo {
                         x: other_player.x,
                         y: other_player.y,
                         z: other_player.z,
-                        texture: other_player.texture.clone(),
-                        width: 0.2,
-                        height: 0.7,
+                        texture: &other_player.texture,
+                        width: 0.5,
+                        height: 1.0,
+                        dist_sq: sprite_x * sprite_x + sprite_y * sprite_y,
+                        frame: Some(frame),
                     });
                 }
             }
 
             // Sort sprites by distance
-            let mut sprites_with_dist: Vec<_> = all_sprites
-                .iter()
-                .map(|sprite| {
-                    let sprite_x = sprite.x - player.x;
-                    let sprite_y = sprite.y - player.y;
-                    let dist_sq = sprite_x * sprite_x + sprite_y * sprite_y;
-                    (sprite, dist_sq)
-                })
-                .collect();
-            sprites_with_dist
-                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            sprite_infos.sort_by(|a, b| {
+                b.dist_sq
+                    .partial_cmp(&a.dist_sq)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
 
-            for (sprite, _) in sprites_with_dist {
-                let sprite_x = sprite.x - player.x;
-                let sprite_y = sprite.y - player.y;
+            for sprite_info in sprite_infos {
+                let sprite_x = sprite_info.x - player.x;
+                let sprite_y = sprite_info.y - player.y;
 
                 let dir_x = player.angle.cos();
                 let dir_y = player.angle.sin();
@@ -168,10 +246,9 @@ impl Renderer {
                     // only draw sprites in front of the player
                     let sprite_screen_x = (WIDTH as f32 / 2.0) * (1.0 + transform_x / transform_y);
 
-                    let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite.height;
+                    let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite_info.height;
                     let world_half = (HEIGHT as f32 / transform_y).abs() * 0.5;
-                    //let camera_height_offset = 0.1;
-                    let sprite_vertical_offset = (player.z + CAMERA_HEIGHT_OFFSET - sprite.z)
+                    let sprite_vertical_offset = (player.z + CAMERA_HEIGHT_OFFSET - sprite_info.z)
                         * HEIGHT as f32
                         / transform_y
                         - sprite_height * 0.5
@@ -188,12 +265,43 @@ impl Renderer {
                         + sprite_vertical_offset)
                         .min(HEIGHT as f32) as usize;
 
-                    let sprite_width = (WIDTH as f32 / transform_y).abs() * sprite.width;
+                    let sprite_width = (WIDTH as f32 / transform_y).abs() * sprite_info.width;
                     let draw_start_x = (sprite_screen_x - sprite_width / 2.0).max(0.0) as usize;
                     let draw_end_x =
                         (sprite_screen_x + sprite_width / 2.0).min(WIDTH as f32) as usize;
 
-                    if let Some(texture) = self.texture_manager.get_texture(&sprite.texture) {
+                    if let Some(frame) = sprite_info.frame {
+                        for stripe in draw_start_x..draw_end_x {
+                            if transform_y < self.z_buffer[stripe] {
+                                let tex_x =
+                                    ((stripe as f32 - (sprite_screen_x - sprite_width / 2.0))
+                                        * frame.width as f32
+                                        / sprite_width) as u32;
+
+                                for y in draw_start_y..draw_end_y {
+                                    let tex_y = ((y as f32
+                                        - (HEIGHT as f32 / 2.0 - sprite_height / 2.0
+                                            + pitch_offset as f32
+                                            + sprite_vertical_offset as f32))
+                                        * frame.height as f32
+                                        / sprite_height)
+                                        as u32;
+
+                                    if tex_x < frame.width && tex_y < frame.height {
+                                        let color =
+                                            frame.pixels[(tex_y * frame.width + tex_x) as usize];
+                                        let alpha = (color >> 24) & 0xFF;
+
+                                        if alpha > 0 {
+                                            self.buffer[y * WIDTH + stripe] = color;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else if let Some(texture) =
+                        self.texture_manager.get_texture(sprite_info.texture)
+                    {
                         for stripe in draw_start_x..draw_end_x {
                             if transform_y < self.z_buffer[stripe] {
                                 let tex_x =
@@ -210,12 +318,14 @@ impl Renderer {
                                         / sprite_height)
                                         as u32;
 
-                                    let color =
-                                        texture.pixels[(tex_y * texture.width + tex_x) as usize];
-                                    let alpha = (color >> 24) & 0xFF;
+                                    if tex_x < texture.width && tex_y < texture.height {
+                                        let color = texture.pixels
+                                            [(tex_y * texture.width + tex_x) as usize];
+                                        let alpha = (color >> 24) & 0xFF;
 
-                                    if alpha > 0 {
-                                        self.buffer[y * WIDTH + stripe] = color;
+                                        if alpha > 0 {
+                                            self.buffer[y * WIDTH + stripe] = color;
+                                        }
                                     }
                                 }
                             }

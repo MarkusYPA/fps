@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 pub mod minimap;
 pub mod renderer;
 pub mod textures;
+pub mod spritesheet;
 
 pub const WIDTH: usize = 1024;
 pub const HEIGHT: usize = 768;
@@ -17,7 +19,7 @@ pub enum ClientMessage {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ServerMessage {
     Welcome(Welcome),
-    GameUpdate(std::collections::HashMap<String, PlayerUpdate>),
+    GameUpdate(HashMap<String, PlayerUpdate>),
     InitialState(GameState),
     UsernameRejected(String),
 }
@@ -25,6 +27,25 @@ pub enum ServerMessage {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Welcome {
     pub id: u64,
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum AnimationState {
+    Idle,
+    Walking,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum Direction {
+    Front,
+    FrontRight,
+    Right,
+    BackRight,
+    Back,
+    BackLeft,
+    Left,
+    FrontLeft,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -35,16 +56,8 @@ pub struct PlayerUpdate {
     pub angle: f32,
     pub pitch: f32,
     pub texture: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Sprite {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub texture: String,
-    pub width: f32,
-    pub height: f32,
+    pub animation_state: AnimationState,
+    pub direction: Direction,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -69,6 +82,10 @@ pub struct Player {
     pub move_speed: f32,
     pub rot_speed: f32,
     pub texture: String,
+    pub animation_state: AnimationState,
+    pub direction: Direction,
+    pub frame: usize,
+    pub frame_timer: f32,
 }
 
 impl Player {
@@ -83,6 +100,10 @@ impl Player {
             move_speed: 0.05,
             rot_speed: 0.03,
             texture: "character4".to_string(),
+            animation_state: AnimationState::Idle,
+            direction: Direction::Front,
+            frame: 0,
+            frame_timer: 0.0,
         }
     }
 
@@ -298,13 +319,20 @@ impl World {
     }
 }
 
-use std::collections::HashMap;
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Sprite {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    pub texture: String,
+    pub width: f32,
+    pub height: f32,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GameState {
     pub players: HashMap<String, Player>,
     pub world: World,
-    pub sprites: Vec<Sprite>,
 }
 
 impl GameState {
@@ -312,30 +340,18 @@ impl GameState {
         GameState {
             players: HashMap::new(),
             world: World::new(),
-            sprites: vec![
-                Sprite {
-                    x: 3.2,
-                    y: 4.3,
-                    z: 0.0,
-                    texture: "character2".to_string(),
-                    width: 0.2,
-                    height: 0.7,
-                },
-                Sprite {
-                    x: 4.2,
-                    y: 4.3,
-                    z: 0.0,
-                    texture: "character3".to_string(),
-                    width: 0.2,
-                    height: 0.7,
-                },
-            ],
         }
     }
 
     pub fn update(&mut self, id: String, input: &Input) {
         if let Some(player) = self.players.get_mut(&id) {
             player.take_input(input, &self.world);
+            if input.forth || input.back || input.left || input.right {
+                player.animation_state = AnimationState::Walking;
+            } else {
+                player.animation_state = AnimationState::Idle;
+            }
+            // TODO: Update direction
         }
     }
 }
