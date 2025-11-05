@@ -25,7 +25,11 @@ impl Texture {
             }
         }
 
-        Ok(Texture { width, height, pixels })
+        Ok(Texture {
+            width,
+            height,
+            pixels,
+        })
     }
 }
 
@@ -55,5 +59,7 @@ pub fn load_game_textures(texture_manager: &mut TextureManager) -> Result<(), im
     texture_manager.load_texture("character1".to_string(), "assets/character1.png")?;
     texture_manager.load_texture("character2".to_string(), "assets/character2.png")?;
     texture_manager.load_texture("character3".to_string(), "assets/character3.png")?;
+    // navigator icon used for the minimap player indicator
+    texture_manager.load_texture("navigator".to_string(), "assets/navigator.png")?;
     Ok(())
 }

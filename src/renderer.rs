@@ -1,9 +1,9 @@
 use crate::{GameState, HEIGHT, WIDTH, textures::TextureManager};
 
 pub struct Renderer {
-    buffer: Vec<u32>,
-    z_buffer: Vec<f32>,
-    texture_manager: TextureManager,
+    pub buffer: Vec<u32>,
+    pub z_buffer: Vec<f32>,
+    pub texture_manager: TextureManager,
 }
 
 impl Renderer {
@@ -121,13 +121,18 @@ impl Renderer {
             // Sprite rendering
 
             // Sort sprites by distance
-            let mut sprites_with_dist: Vec<_> = game_state.sprites.iter().map(|sprite| {
-                let sprite_x = sprite.x - player.x;
-                let sprite_y = sprite.y - player.y;
-                let dist_sq = sprite_x * sprite_x + sprite_y * sprite_y;
-                (sprite, dist_sq)
-            }).collect();
-            sprites_with_dist.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            let mut sprites_with_dist: Vec<_> = game_state
+                .sprites
+                .iter()
+                .map(|sprite| {
+                    let sprite_x = sprite.x - player.x;
+                    let sprite_y = sprite.y - player.y;
+                    let dist_sq = sprite_x * sprite_x + sprite_y * sprite_y;
+                    (sprite, dist_sq)
+                })
+                .collect();
+            sprites_with_dist
+                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
             for (sprite, _) in sprites_with_dist {
                 let sprite_x = sprite.x - player.x;
@@ -144,31 +149,51 @@ impl Renderer {
                 let transform_x = inv_det * (dir_y * sprite_x - dir_x * sprite_y);
                 let transform_y = inv_det * (-plane_y * sprite_x + plane_x * sprite_y);
 
-                if transform_y > 0.0 { // only draw sprites in front of the player
+                if transform_y > 0.0 {
+                    // only draw sprites in front of the player
                     let sprite_screen_x = (WIDTH as f32 / 2.0) * (1.0 + transform_x / transform_y);
 
                     let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite.height;
                     let world_half = (HEIGHT as f32 / transform_y).abs() * 0.5;
-                    let sprite_vertical_offset = (player.z - sprite.z) * HEIGHT as f32 / transform_y - sprite_height * 0.5 + world_half;
+                    let sprite_vertical_offset =
+                        (player.z - sprite.z) * HEIGHT as f32 / transform_y - sprite_height * 0.5
+                            + world_half;
 
-                    let draw_start_y = (-sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_vertical_offset)
+                    let draw_start_y = (-sprite_height / 2.0
+                        + HEIGHT as f32 / 2.0
+                        + pitch_offset as f32
+                        + sprite_vertical_offset)
                         .max(0.0) as usize;
-                    let draw_end_y = (sprite_height / 2.0 + HEIGHT as f32 / 2.0 + pitch_offset as f32 + sprite_vertical_offset)
+                    let draw_end_y = (sprite_height / 2.0
+                        + HEIGHT as f32 / 2.0
+                        + pitch_offset as f32
+                        + sprite_vertical_offset)
                         .min(HEIGHT as f32) as usize;
 
                     let sprite_width = (WIDTH as f32 / transform_y).abs() * sprite.width;
                     let draw_start_x = (sprite_screen_x - sprite_width / 2.0).max(0.0) as usize;
-                    let draw_end_x = (sprite_screen_x + sprite_width / 2.0).min(WIDTH as f32) as usize;
+                    let draw_end_x =
+                        (sprite_screen_x + sprite_width / 2.0).min(WIDTH as f32) as usize;
 
                     if let Some(texture) = self.texture_manager.get_texture(&sprite.texture) {
                         for stripe in draw_start_x..draw_end_x {
                             if transform_y < self.z_buffer[stripe] {
-                                let tex_x = ((stripe as f32 - (sprite_screen_x - sprite_width / 2.0)) * texture.width as f32 / sprite_width) as u32;
+                                let tex_x =
+                                    ((stripe as f32 - (sprite_screen_x - sprite_width / 2.0))
+                                        * texture.width as f32
+                                        / sprite_width) as u32;
 
                                 for y in draw_start_y..draw_end_y {
-                                    let tex_y = ((y as f32 - (HEIGHT as f32 / 2.0 - sprite_height / 2.0 + pitch_offset as f32 + sprite_vertical_offset as f32)) * texture.height as f32 / sprite_height) as u32;
+                                    let tex_y = ((y as f32
+                                        - (HEIGHT as f32 / 2.0 - sprite_height / 2.0
+                                            + pitch_offset as f32
+                                            + sprite_vertical_offset as f32))
+                                        * texture.height as f32
+                                        / sprite_height)
+                                        as u32;
 
-                                    let color = texture.pixels[(tex_y * texture.width + tex_x) as usize];
+                                    let color =
+                                        texture.pixels[(tex_y * texture.width + tex_x) as usize];
                                     let alpha = (color >> 24) & 0xFF;
 
                                     if alpha > 0 {
@@ -181,6 +206,9 @@ impl Renderer {
                 }
             }
         }
+
+        // Render minimap overlay
+        self.render_minimap(game_state, my_id);
     }
 
     pub fn draw_to_buffer(&self, frame: &mut [u8]) {
