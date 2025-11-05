@@ -1,6 +1,7 @@
 use image::{self, GenericImageView};
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct Texture {
     pub width: u32,
     pub height: u32,

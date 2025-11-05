@@ -1,3 +1,4 @@
+use crate::textures::{self};
 use crate::{
     Direction, GameState, HEIGHT, Sprite, WIDTH, spritesheet::SpriteSheet, textures::TextureManager,
 };
@@ -40,7 +41,7 @@ struct SpriteInfo<'a> {
     width: f32,
     height: f32,
     dist_sq: f32,
-    frame: Option<&'a crate::spritesheet::Frame>,
+    frame: Option<&'a textures::Texture>,
 }
 
 impl Renderer {
@@ -270,14 +271,17 @@ impl Renderer {
                         (sprite_screen_x + sprite_width / 2.0).min(WIDTH as f32) as usize;
 
                     // animation frames or static sprites
-                    if let Some(frame) = sprite_info.frame {
-                        // process frame vertical lines
+                    if let Some(raster) = sprite_info
+                        .frame
+                        .or_else(|| self.texture_manager.get_texture(sprite_info.texture))
+                    {
+                        // process vertical lines
                         for stripe in draw_start_x..draw_end_x {
-                            // check if line would be closer than any wall there
+                            // proceed if line is closer than any wall there
                             if transform_y < self.z_buffer[stripe] {
                                 let tex_x =
                                     ((stripe as f32 - (sprite_screen_x - sprite_width / 2.0))
-                                        * frame.width as f32
+                                        * raster.width as f32
                                         / sprite_width) as u32;
 
                                 // get pixels on the vertical line
@@ -286,47 +290,16 @@ impl Renderer {
                                         - (HEIGHT as f32 / 2.0 - sprite_height / 2.0
                                             + pitch_offset as f32
                                             + sprite_vertical_offset as f32))
-                                        * frame.height as f32
+                                        * raster.height as f32
                                         / sprite_height)
                                         as u32;
 
-                                    if tex_x < frame.width && tex_y < frame.height {
+                                    if tex_x < raster.width && tex_y < raster.height {
                                         let color =
-                                            frame.pixels[(tex_y * frame.width + tex_x) as usize];
+                                            raster.pixels[(tex_y * raster.width + tex_x) as usize];
                                         let alpha = (color >> 24) & 0xFF;
 
                                         // save to renderer buffer
-                                        if alpha > 0 {
-                                            self.buffer[y * WIDTH + stripe] = color;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else if let Some(texture) =
-                        self.texture_manager.get_texture(sprite_info.texture)
-                    {
-                        for stripe in draw_start_x..draw_end_x {
-                            if transform_y < self.z_buffer[stripe] {
-                                let tex_x =
-                                    ((stripe as f32 - (sprite_screen_x - sprite_width / 2.0))
-                                        * texture.width as f32
-                                        / sprite_width) as u32;
-
-                                for y in draw_start_y..draw_end_y {
-                                    let tex_y = ((y as f32
-                                        - (HEIGHT as f32 / 2.0 - sprite_height / 2.0
-                                            + pitch_offset as f32
-                                            + sprite_vertical_offset as f32))
-                                        * texture.height as f32
-                                        / sprite_height)
-                                        as u32;
-
-                                    if tex_x < texture.width && tex_y < texture.height {
-                                        let color = texture.pixels
-                                            [(tex_y * texture.width + tex_x) as usize];
-                                        let alpha = (color >> 24) & 0xFF;
-
                                         if alpha > 0 {
                                             self.buffer[y * WIDTH + stripe] = color;
                                         }

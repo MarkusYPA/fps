@@ -1,20 +1,13 @@
-
-use image::{self, GenericImageView, Rgba};
+use crate::textures::Texture;
 use image::error::{ParameterError, ParameterErrorKind};
+use image::{self, GenericImageView, Rgba};
 
 const CYAN_TRANSPARENT: Rgba<u8> = Rgba([0, 255, 255, 255]);
 
 #[derive(Debug)]
-pub struct Frame {
-    pub pixels: Vec<u32>,
-    pub width: u32,
-    pub height: u32,
-}
-
-#[derive(Debug)]
 pub struct SpriteSheet {
-    pub idle: [Frame; 8],
-    pub walk: [[Frame; 4]; 8],
+    pub idle: [Texture; 8],
+    pub walk: [[Texture; 4]; 8],
 }
 
 impl SpriteSheet {
@@ -23,16 +16,28 @@ impl SpriteSheet {
 
         // rott-ianpaulfreeley.png spritesheet frames are 91x92 pixels each with one line of pixels in between. Rows start at somewhat arbitrary places.
         let idle_frames_vec = Self::load_animation_frames(&img, 1, 34, 8, 8, 91, 92)?;
-        let idle_frames: [Frame; 8] = idle_frames_vec.try_into().map_err(|_| image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic("Incorrect number of idle frames".into()))))?;
+        let idle_frames: [Texture; 8] = idle_frames_vec.try_into().map_err(|_| {
+            image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic(
+                "Incorrect number of idle frames".into(),
+            )))
+        })?;
 
         let walk_frames_vec: Vec<_> = (0..8)
-            .map(|i| -> Result<[Frame; 4], image::ImageError> {
+            .map(|i| -> Result<[Texture; 4], image::ImageError> {
                 let frames = Self::load_animation_frames(&img, 1, 142 + i * 93, 4, 4, 91, 92)?;
-                frames.try_into().map_err(|_| image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic("Incorrect number of walk frames".into()))))
+                frames.try_into().map_err(|_| {
+                    image::ImageError::Parameter(ParameterError::from_kind(
+                        ParameterErrorKind::Generic("Incorrect number of walk frames".into()),
+                    ))
+                })
             })
-            .collect::<Result<Vec<[Frame; 4]>, _>>()?;
+            .collect::<Result<Vec<[Texture; 4]>, _>>()?;
 
-        let walk_frames: [[Frame; 4]; 8] = walk_frames_vec.try_into().map_err(|_| image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic("Incorrect number of walk animation rows".into()))))?;
+        let walk_frames: [[Texture; 4]; 8] = walk_frames_vec.try_into().map_err(|_| {
+            image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic(
+                "Incorrect number of walk animation rows".into(),
+            )))
+        })?;
 
         Ok(SpriteSheet {
             idle: idle_frames,
@@ -48,7 +53,7 @@ impl SpriteSheet {
         frames_in_row: u32,
         frame_width: u32,
         frame_height: u32,
-    ) -> Result<Vec<Frame>, image::ImageError> {
+    ) -> Result<Vec<Texture>, image::ImageError> {
         let mut frames = Vec::new();
         for i in 0..num_frames {
             let x = start_x + (i % frames_in_row) * (frame_width + 1);
@@ -70,7 +75,7 @@ impl SpriteSheet {
                     pixels.push(color);
                 }
             }
-            frames.push(Frame {
+            frames.push(Texture {
                 pixels,
                 width: frame_width,
                 height: frame_height,

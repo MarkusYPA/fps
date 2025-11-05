@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub mod minimap;
 pub mod renderer;
-pub mod textures;
 pub mod spritesheet;
+pub mod textures;
 
 pub const WIDTH: usize = 1024;
 pub const HEIGHT: usize = 768;
@@ -28,7 +28,6 @@ pub enum ServerMessage {
 pub struct Welcome {
     pub id: u64,
 }
-
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum AnimationState {
