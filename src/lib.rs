@@ -212,11 +212,9 @@ impl Player {
 
         // --- Apply movement ---
         if clear_x {
-            //self.x = new_x;
             self.x += dx;
         }
         if clear_y {
-            //self.y = new_y;
             self.y += dy;
         }
     }
@@ -351,7 +349,6 @@ impl GameState {
             } else {
                 player.animation_state = AnimationState::Idle;
             }
-            // TODO: Update direction
         }
     }
 }

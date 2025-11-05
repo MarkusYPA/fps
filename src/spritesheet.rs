@@ -21,6 +21,7 @@ impl SpriteSheet {
     pub fn new(path: &str) -> Result<Self, image::ImageError> {
         let img = image::open(path)?;
 
+        // rott-ianpaulfreeley.png spritesheet frames are 91x92 pixels each with one line of pixels in between. Rows start at somewhat arbitrary places.
         let idle_frames_vec = Self::load_animation_frames(&img, 1, 34, 8, 8, 91, 92)?;
         let idle_frames: [Frame; 8] = idle_frames_vec.try_into().map_err(|_| image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic("Incorrect number of idle frames".into()))))?;
 
