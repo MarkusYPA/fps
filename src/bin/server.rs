@@ -136,7 +136,6 @@ fn main() -> std::io::Result<()> {
                         pitch: player.pitch,
                         texture: player.texture.clone(),
                         animation_state: player.animation_state.clone(),
-                        direction: player.direction.clone(),
                     },
                 );
             }

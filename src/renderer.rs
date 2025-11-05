@@ -6,10 +6,7 @@ use crate::{
 const CAMERA_HEIGHT_OFFSET: f32 = 0.1;
 
 fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
-    let mut angle_diff = (player_angle - camera_angle).to_degrees() + 180.0;
-    if angle_diff < 0.0 {
-        angle_diff += 360.0;
-    }
+    let angle_diff = ((player_angle - camera_angle).to_degrees() + 180.0).rem_euclid(360.0);
     let direction_index = (angle_diff / 45.0).round() as usize % 8;
 
     match direction_index {
@@ -21,7 +18,7 @@ fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
         5 => Direction::BackLeft,
         6 => Direction::Left,
         7 => Direction::FrontLeft,
-        _ => Direction::Front,
+        _ => unreachable!(),
     }
 }
 

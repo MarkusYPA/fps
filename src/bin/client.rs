@@ -277,7 +277,6 @@ fn main() -> Result<()> {
                                             player.pitch = update.pitch;
                                             player.texture = update.texture;
                                             player.animation_state = update.animation_state;
-                                            player.direction = update.direction;
                                         } else {
                                             // New player joined — insert into local game state
                                             let mut p = fps::Player::new();
@@ -288,7 +287,7 @@ fn main() -> Result<()> {
                                             p.pitch = update.pitch;
                                             p.texture = update.texture;
                                             p.animation_state = update.animation_state;
-                                            p.direction = update.direction;
+                                            p.direction = fps::Direction::Front;
                                             gs.players.insert(id.clone(), p);
                                         }
                                     }

@@ -56,7 +56,6 @@ pub struct PlayerUpdate {
     pub pitch: f32,
     pub texture: String,
     pub animation_state: AnimationState,
-    pub direction: Direction,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
