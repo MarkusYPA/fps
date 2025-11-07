@@ -14,6 +14,7 @@ pub const PORT: u16 = 8080;
 pub enum ClientMessage {
     Connect(String),
     Input(Input),
+    Ping,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -22,6 +23,7 @@ pub enum ServerMessage {
     GameUpdate(HashMap<String, PlayerUpdate>),
     InitialState(GameState),
     UsernameRejected(String),
+    PlayerLeft(u64),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
