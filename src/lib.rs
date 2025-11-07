@@ -20,7 +20,7 @@ pub enum ClientMessage {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ServerMessage {
     Welcome(Welcome),
-    GameUpdate(std::collections::HashMap<String, PlayerUpdate>),
+    GameUpdate(HashMap<String, PlayerUpdate>),
     InitialState(GameState),
     UsernameRejected(String),
     PlayerLeft(u64),
