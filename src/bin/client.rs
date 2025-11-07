@@ -13,11 +13,11 @@ use winit::window::{CursorGrabMode, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
-    ClientMessage, GameState, HEIGHT, Input, PORT, ServerMessage, WIDTH, renderer::Renderer,
+    ClientMessage, GameState, Input, ServerMessage,
+    consts::{HEIGHT, MOUSE_SPEED, PORT, WIDTH},
+    renderer::Renderer,
     textures::TextureManager,
 };
-
-const MOUSE_SPEED: f32 = 0.06;
 
 fn main() -> Result<()> {
     println!("Enter server IP address:");

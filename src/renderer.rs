@@ -1,9 +1,14 @@
 use crate::textures::{self};
 use crate::{
-    Direction, GameState, HEIGHT, Sprite, WIDTH, spritesheet::SpriteSheet, textures::TextureManager,
+    Direction, GameState, Sprite,
+    consts::{
+        CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, FLOOR_COLOR, HEIGHT,
+        SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
+        WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
+    },
+    spritesheet::SpriteSheet,
+    textures::TextureManager,
 };
-
-const CAMERA_HEIGHT_OFFSET: f32 = 0.1;
 
 fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
     let angle_diff = ((player_angle - camera_angle).to_degrees() + 180.0).rem_euclid(360.0);
@@ -49,16 +54,16 @@ impl Renderer {
                 y: 4.3,
                 z: 0.0,
                 texture: "character2".to_string(),
-                width: 0.2,
-                height: 0.7,
+                width: SPRITE_NPC_WIDTH,
+                height: SPRITE_NPC_HEIGHT,
             },
             Sprite {
                 x: 4.2,
                 y: 4.3,
                 z: 0.0,
                 texture: "character3".to_string(),
-                width: 0.2,
-                height: 0.7,
+                width: SPRITE_NPC_WIDTH,
+                height: SPRITE_NPC_HEIGHT,
             },
         ];
         Renderer {
@@ -71,28 +76,42 @@ impl Renderer {
     }
 
     pub fn render(&mut self, game_state: &GameState, my_id: u64) {
+        // Store constants locally for better performance in hot loops
+        let width = WIDTH;
+        let height = HEIGHT;
+        let camera_plane_scale = CAMERA_PLANE_SCALE;
+        let camera_height_offset = CAMERA_HEIGHT_OFFSET;
+        let ceiling_color = CEILING_COLOR;
+        let floor_color = FLOOR_COLOR;
+        let wall_color_primary = WALL_COLOR_PRIMARY;
+        let wall_color_secondary = WALL_COLOR_SECONDARY;
+        let sprite_other_player_width = SPRITE_OTHER_PLAYER_WIDTH;
+        let sprite_other_player_height = SPRITE_OTHER_PLAYER_HEIGHT;
+
         if let Some(player) = game_state.players.get(&my_id.to_string()) {
-            let pitch_offset = (player.pitch * HEIGHT as f32 / 2.0) as isize;
-            let horizon = (HEIGHT as isize / 2 + pitch_offset).clamp(0, HEIGHT as isize) as usize;
+            let pitch_offset = (player.pitch * height as f32 / 2.0) as isize;
+            let horizon = (height as isize / 2 + pitch_offset).clamp(0, height as isize) as usize;
 
             // Clear the buffer with ceiling and floor colors
             for y in 0..horizon {
-                for x in 0..WIDTH {
-                    self.buffer[y * WIDTH + x] = 0x00AACCFF; // Ceiling
+                for x in 0..width {
+                    self.buffer[y * width + x] = ceiling_color;
                 }
             }
-            for y in horizon..HEIGHT {
-                for x in 0..WIDTH {
-                    self.buffer[y * WIDTH + x] = 0x00555555; // Floor
+            for y in horizon..height {
+                for x in 0..width {
+                    self.buffer[y * width + x] = floor_color;
                 }
             }
 
             // cast one ray for each pixel in width
-            for x in 0..WIDTH {
+            for x in 0..width {
                 // ray direction
-                let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
-                let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
-                let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
+                let camera_x = 2.0 * x as f32 / width as f32 - 1.0;
+                let ray_dir_x =
+                    player.angle.cos() + camera_plane_scale * camera_x * (-player.angle.sin());
+                let ray_dir_y =
+                    player.angle.sin() + camera_plane_scale * camera_x * player.angle.cos();
 
                 // direction and steps to measure if wall was hit
                 let mut map_x = player.x as usize;
@@ -150,22 +169,22 @@ impl Renderer {
                 self.z_buffer[x] = perp_wall_dist;
 
                 // line hight from distance, start and end points account for jump, pitch and camera offset
-                let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-                let z_offset = ((player.z + CAMERA_HEIGHT_OFFSET) * line_height as f32) as isize;
-                let draw_start = (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
-                    .clamp(0, HEIGHT as isize - 1) as usize;
-                let draw_end = (line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
-                    .clamp(0, HEIGHT as isize) as usize;
+                let line_height = (height as f32 / perp_wall_dist) as isize;
+                let z_offset = ((player.z + camera_height_offset) * line_height as f32) as isize;
+                let draw_start = (-line_height / 2 + height as isize / 2 + pitch_offset + z_offset)
+                    .clamp(0, height as isize - 1) as usize;
+                let draw_end = (line_height / 2 + height as isize / 2 + pitch_offset + z_offset)
+                    .clamp(0, height as isize) as usize;
 
                 let wall_color = if wall_type == 1 {
-                    0x008A7755
+                    wall_color_primary
                 } else {
-                    0x00695A41
+                    wall_color_secondary
                 };
 
                 // save vertical wall line to buffer
                 for y in draw_start..draw_end {
-                    self.buffer[y * WIDTH + x] = wall_color;
+                    self.buffer[y * width + x] = wall_color;
                 }
             }
 
@@ -207,8 +226,8 @@ impl Renderer {
                         y: other_player.y,
                         z: other_player.z,
                         texture: &other_player.texture,
-                        width: 0.5,
-                        height: 0.7,
+                        width: sprite_other_player_width,
+                        height: sprite_other_player_height,
                         dist_sq: sprite_x * sprite_x + sprite_y * sprite_y,
                         frame: Some(frame),
                     });
@@ -230,8 +249,8 @@ impl Renderer {
                 let dir_x = player.angle.cos();
                 let dir_y = player.angle.sin();
 
-                let plane_x = -dir_y * 0.66;
-                let plane_y = dir_x * 0.66;
+                let plane_x = -dir_y * camera_plane_scale;
+                let plane_y = dir_x * camera_plane_scale;
 
                 let inv_det = 1.0 / (plane_x * dir_y - dir_x * plane_y);
                 let transform_x = inv_det * (dir_y * sprite_x - dir_x * sprite_y);
@@ -239,33 +258,33 @@ impl Renderer {
 
                 // only draw sprites in front of the player
                 if transform_y > 0.0 {
-                    let sprite_screen_x = (WIDTH as f32 / 2.0) * (1.0 + transform_x / transform_y);
+                    let sprite_screen_x = (width as f32 / 2.0) * (1.0 + transform_x / transform_y);
 
                     // put sprite on the floor if its z is 0
-                    let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite_info.height;
-                    let world_half = (HEIGHT as f32 / transform_y).abs() * 0.5;
-                    let sprite_vertical_offset = (player.z + CAMERA_HEIGHT_OFFSET - sprite_info.z)
-                        * HEIGHT as f32
+                    let sprite_height = (height as f32 / transform_y).abs() * sprite_info.height;
+                    let world_half = (height as f32 / transform_y).abs() * 0.5;
+                    let sprite_vertical_offset = (player.z + camera_height_offset - sprite_info.z)
+                        * height as f32
                         / transform_y
                         - sprite_height * 0.5
                         + world_half;
 
                     // start and end points with both z:s, pitch and camera offset accounted for
                     let draw_start_y = (-sprite_height / 2.0
-                        + HEIGHT as f32 / 2.0
+                        + height as f32 / 2.0
                         + pitch_offset as f32
                         + sprite_vertical_offset)
                         .max(0.0) as usize;
                     let draw_end_y = (sprite_height / 2.0
-                        + HEIGHT as f32 / 2.0
+                        + height as f32 / 2.0
                         + pitch_offset as f32
                         + sprite_vertical_offset)
-                        .min(HEIGHT as f32) as usize;
+                        .min(height as f32) as usize;
 
-                    let sprite_width = (WIDTH as f32 / transform_y).abs() * sprite_info.width;
+                    let sprite_width = (width as f32 / transform_y).abs() * sprite_info.width;
                     let draw_start_x = (sprite_screen_x - sprite_width / 2.0).max(0.0) as usize;
                     let draw_end_x =
-                        (sprite_screen_x + sprite_width / 2.0).min(WIDTH as f32) as usize;
+                        (sprite_screen_x + sprite_width / 2.0).min(width as f32) as usize;
 
                     // animation frames or static sprites
                     if let Some(raster) = sprite_info
@@ -284,7 +303,7 @@ impl Renderer {
                                 // get pixels on the vertical line
                                 for y in draw_start_y..draw_end_y {
                                     let tex_y = ((y as f32
-                                        - (HEIGHT as f32 / 2.0 - sprite_height / 2.0
+                                        - (height as f32 / 2.0 - sprite_height / 2.0
                                             + pitch_offset as f32
                                             + sprite_vertical_offset as f32))
                                         * raster.height as f32
@@ -298,7 +317,7 @@ impl Renderer {
 
                                         // save to renderer buffer
                                         if alpha > 0 {
-                                            self.buffer[y * WIDTH + stripe] = color;
+                                            self.buffer[y * width + stripe] = color;
                                         }
                                     }
                                 }

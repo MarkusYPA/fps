@@ -13,6 +13,7 @@ local-ip-address = "0.6.5"
 anyhow = "1.0"
 rayon = "1.11.0"
 image = { version = "0.24", features = ["png"] }
+toml = "0.8"
 
 [[bin]]
 name = "server"

@@ -1,14 +1,21 @@
+use crate::map::World;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::consts::{
+    DEFAULT_PLAYER_MOVE_SPEED,
+    DEFAULT_PLAYER_ROT_SPEED,
+    PLAYER_JUMP_VELOCITY,
+    PLAYER_PITCH_LIMIT,
+};
+
+pub mod consts;
+pub mod flags;
+pub mod map;
 pub mod minimap;
 pub mod renderer;
 pub mod spritesheet;
 pub mod textures;
-
-pub const WIDTH: usize = 1024;
-pub const HEIGHT: usize = 768;
-pub const PORT: u16 = 8080;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ClientMessage {
@@ -97,8 +104,8 @@ impl Player {
             angle: std::f32::consts::PI / 2.0,
             pitch: 0.0,
             velocity_z: 0.0,
-            move_speed: 0.05,
-            rot_speed: 0.03,
+            move_speed: DEFAULT_PLAYER_MOVE_SPEED,
+            rot_speed: DEFAULT_PLAYER_ROT_SPEED,
             texture: "character4".to_string(),
             animation_state: AnimationState::Idle,
             direction: Direction::Front,
@@ -141,13 +148,13 @@ impl Player {
         self.check_collision_and_move(new_x, new_y, world);
 
         if input.jump && self.z == 0.0 {
-            self.velocity_z = 0.028;
+            self.velocity_z = PLAYER_JUMP_VELOCITY;
         }
 
         self.angle += input.turn * self.rot_speed;
         self.pitch = (self.pitch + input.pitch * self.rot_speed * 2.0).clamp(
-            -std::f32::consts::PI / 2.5, // restrict pitch angle
-            std::f32::consts::PI / 2.5,
+            -PLAYER_PITCH_LIMIT,
+            PLAYER_PITCH_LIMIT,
         );
     }
 
@@ -221,103 +228,6 @@ impl Player {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct World {
-    pub map: Vec<Vec<u8>>,
-}
-
-impl World {
-    pub fn new() -> Self {
-        World {
-            map: vec![
-                vec![
-                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                ],
-                vec![
-                    1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1,
-                ],
-                vec![
-                    1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                ],
-                vec![
-                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1,
-                ],
-                vec![
-                    1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1,
-                ],
-                vec![
-                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1,
-                ],
-                vec![
-                    1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1,
-                ],
-                vec![
-                    1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 1,
-                ],
-                vec![
-                    1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
-                ],
-                vec![
-                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1,
-                ],
-                vec![
-                    1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
-                ],
-                vec![
-                    1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1,
-                ],
-                vec![
-                    1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1,
-                ],
-                vec![
-                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1,
-                ],
-                vec![
-                    1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1,
-                ],
-                vec![
-                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1,
-                ],
-                vec![
-                    1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
-                ],
-                vec![
-                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1,
-                ],
-                vec![
-                    1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1,
-                ],
-                vec![
-                    1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1,
-                ],
-                vec![
-                    1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1,
-                ],
-                vec![
-                    1, 0, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1,
-                ],
-                vec![
-                    1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
-                ],
-                vec![
-                    1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1,
-                ],
-                vec![
-                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                ],
-            ],
-        }
-    }
-
-    pub fn get_tile(&self, x: usize, y: usize) -> u8 {
-        if x < self.map.len() && y < self.map[0].len() {
-            self.map[y][x]
-        } else {
-            1
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Sprite {
     pub x: f32,
     pub y: f32,
@@ -334,10 +244,11 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn new() -> Self {
+    pub fn new(map_id: Option<usize>) -> Self {
+        let map_id = map_id.unwrap_or(1);
         GameState {
             players: HashMap::new(),
-            world: World::new(),
+            world: World::new(Some(map_id)),
         }
     }
 
