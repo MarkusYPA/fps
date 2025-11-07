@@ -13,14 +13,14 @@ pub struct SpriteSheet {
 impl SpriteSheet {
     pub fn new(path: &str) -> Result<Self, image::ImageError> {
         let mut img = image::open(path)?;
-        let mut idle_frames_vec = Vec::new();
+        let idle_frames_vec;
 
         if path.contains("rott") {
             // rott-ianpaulfreeley.png spritesheet frames are 91x92 pixels each with one line of pixels in between. Rows start at somewhat arbitrary places.
-            idle_frames_vec = Self::load_animation_frames(&img, 1, 34, 8, 8, 91, 92)?;
+            idle_frames_vec = Self::load_animation_frames(&img, 1, 34, 8, 8, 91, 92, 1, 1)?;
         } else {
-            // blob1.png spritesheet frames are 138x184 pixels each with two lines of pixels in between.
-            idle_frames_vec = Self::load_animation_frames(&img, 1, 1, 8, 8, 138, 184)?;
+            // blob1.png spritesheet frames are 276 x 368 pixels each with 4 lines of pixels in between.
+            idle_frames_vec = Self::load_animation_frames(&img, 2, 2, 8, 8, 276, 368, 4, 4)?;
 
             // set img to one compatible with the walking frames for now
             img = image::open("assets/rott-ianpaulfreeley.png")?;
@@ -34,7 +34,8 @@ impl SpriteSheet {
 
         let walk_frames_vec: Vec<_> = (0..8)
             .map(|i| -> Result<[Texture; 4], image::ImageError> {
-                let frames = Self::load_animation_frames(&img, 1, 142 + i * 93, 4, 4, 91, 92)?;
+                let frames =
+                    Self::load_animation_frames(&img, 1, 142 + i * 93, 4, 4, 91, 92, 1, 1)?;
                 frames.try_into().map_err(|_| {
                     image::ImageError::Parameter(ParameterError::from_kind(
                         ParameterErrorKind::Generic("Incorrect number of walk frames".into()),
@@ -63,11 +64,13 @@ impl SpriteSheet {
         frames_in_row: u32,
         frame_width: u32,
         frame_height: u32,
+        gap_x: u32,
+        gap_y: u32,
     ) -> Result<Vec<Texture>, image::ImageError> {
         let mut frames = Vec::new();
         for i in 0..num_frames {
-            let x = start_x + (i % frames_in_row) * (frame_width + 1);
-            let y = start_y + (i / frames_in_row) * (frame_height + 1);
+            let x = start_x + (i % frames_in_row) * (frame_width + gap_x);
+            let y = start_y + (i / frames_in_row) * (frame_height + gap_y);
 
             let frame_img = img.view(x, y, frame_width, frame_height);
             let mut pixels = Vec::with_capacity((frame_width * frame_height) as usize);

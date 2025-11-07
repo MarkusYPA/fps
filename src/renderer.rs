@@ -196,7 +196,8 @@ impl Renderer {
                 if id != &my_id.to_string() {
                     let direction = get_direction(other_player.angle, player.angle);
                     let frame = match other_player.animation_state {
-                        crate::AnimationState::Idle => &self.sprite_sheet.idle[direction as usize],
+                        //crate::AnimationState::Idle => &self.sprite_sheet.idle[direction as usize],
+                        crate::AnimationState::Idle => &self.sprite_sheet_test.idle[direction as usize],
                         crate::AnimationState::Walking => {
                             &self.sprite_sheet.walk[direction as usize][other_player.frame]
                         }

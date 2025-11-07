@@ -28,15 +28,15 @@
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
      inkscape:zoom="0.59790957"
-     inkscape:cx="1855.6318"
-     inkscape:cy="368.78487"
+     inkscape:cx="890.60291"
+     inkscape:cy="263.41776"
      inkscape:window-width="2240"
      inkscape:window-height="1108"
      inkscape:window-x="0"
      inkscape:window-y="31"
      inkscape:window-maximized="1"
      inkscape:current-layer="layer2"
-     showgrid="false">
+     showgrid="true">
     <inkscape:grid
        id="grid16"
        units="mm"
@@ -50,7 +50,7 @@
        opacity="0.14901961"
        empspacing="5"
        enabled="true"
-       visible="false" />
+       visible="true" />
   </sodipodi:namedview>
   <defs
      id="defs1">
@@ -305,7 +305,8 @@
        height="184"
        x="1"
        y="1"
-       ry="0" />
+       ry="0"
+       inkscape:label="rect16" />
     <use
        x="0"
        y="0"
@@ -313,7 +314,7 @@
        id="use90"
        transform="translate(559.99999)" />
     <rect
-       style="fill:#00ffff;fill-opacity:0;stroke-width:2.97044;stroke-linecap:square"
+       style="fill:#007a7a;fill-opacity:0;stroke-width:2.97044;stroke-linecap:square"
        id="use165"
        width="138"
        height="184"
@@ -321,6 +322,42 @@
        y="1"
        ry="0"
        transform="scale(-1,1)" />
+    <use
+       x="0"
+       y="0"
+       xlink:href="#rect16"
+       id="use201"
+       transform="translate(140)" />
+    <use
+       x="0"
+       y="0"
+       xlink:href="#use201"
+       id="use202"
+       transform="translate(140)" />
+    <use
+       x="0"
+       y="0"
+       xlink:href="#use202"
+       id="use203"
+       transform="translate(139.99999)" />
+    <use
+       x="0"
+       y="0"
+       xlink:href="#use90"
+       id="use204"
+       transform="translate(140)" />
+    <use
+       x="0"
+       y="0"
+       xlink:href="#use204"
+       id="use205"
+       transform="translate(140)" />
+    <use
+       x="0"
+       y="0"
+       xlink:href="#use205"
+       id="use206"
+       transform="translate(139.99999)" />
   </g>
   <g
      inkscape:label="character"
