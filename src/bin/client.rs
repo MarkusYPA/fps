@@ -18,6 +18,7 @@ use fps::{
 };
 
 const MOUSE_SPEED: f32 = 0.06;
+const FRAME_TIME: f32 = 0.05;
 
 fn main() -> Result<()> {
     println!("Enter server IP address:");
@@ -156,7 +157,7 @@ fn main() -> Result<()> {
             for player in gs.players.values_mut() {
                 if player.animation_state == fps::AnimationState::Walking {
                     player.frame_timer += delta_time;
-                    if player.frame_timer > 0.150 {
+                    if player.frame_timer > FRAME_TIME {
                         player.frame_timer = 0.0;
                         player.frame = (player.frame + 1) % 4;
                     }

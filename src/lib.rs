@@ -153,7 +153,7 @@ impl Player {
 
     // Verbose but fast function that avoids heap allocation, vector creation and branching
     fn check_collision_and_move(&mut self, new_x: f32, new_y: f32, world: &World) {
-        let radius = 0.125;
+        let radius = 0.2;
         let dx = new_x - self.x;
         let dy = new_y - self.y;
 

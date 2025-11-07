@@ -199,7 +199,8 @@ impl Renderer {
                         //crate::AnimationState::Idle => &self.sprite_sheet.idle[direction as usize],
                         crate::AnimationState::Idle => &self.sprite_sheet_test.idle[direction as usize],
                         crate::AnimationState::Walking => {
-                            &self.sprite_sheet.walk[direction as usize][other_player.frame]
+                            //&self.sprite_sheet.walk[direction as usize][other_player.frame]
+                            &self.sprite_sheet_test.walk[direction as usize][other_player.frame]
                         }
                     };
 
@@ -210,7 +211,7 @@ impl Renderer {
                         y: other_player.y,
                         z: other_player.z,
                         texture: &other_player.texture,
-                        width: 0.5,
+                        width: 0.4,
                         height: 0.7,
                         dist_sq: sprite_x * sprite_x + sprite_y * sprite_y,
                         frame: Some(frame),

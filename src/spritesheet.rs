@@ -12,18 +12,18 @@ pub struct SpriteSheet {
 
 impl SpriteSheet {
     pub fn new(path: &str) -> Result<Self, image::ImageError> {
-        let mut img = image::open(path)?;
+        let img = image::open(path)?;
         let idle_frames_vec;
 
         if path.contains("rott") {
             // rott-ianpaulfreeley.png spritesheet frames are 91x92 pixels each with one line of pixels in between. Rows start at somewhat arbitrary places.
             idle_frames_vec = Self::load_animation_frames(&img, 1, 34, 8, 8, 91, 92, 1, 1)?;
         } else {
-            // blob1.png spritesheet frames are 276 x 368 pixels each with 4 lines of pixels in between.
-            idle_frames_vec = Self::load_animation_frames(&img, 2, 2, 8, 8, 276, 368, 4, 4)?;
+            // blob1.png spritesheet frames are 276 x 338 pixels each with 4 lines of pixels in between.
+            idle_frames_vec = Self::load_animation_frames(&img, 2, 2, 8, 8, 276, 338, 4, 2)?;
 
             // set img to one compatible with the walking frames for now
-            img = image::open("assets/rott-ianpaulfreeley.png")?;
+            //img = image::open("assets/rott-ianpaulfreeley.png")?;
         }
 
         let idle_frames: [Texture; 8] = idle_frames_vec.try_into().map_err(|_| {
@@ -32,17 +32,34 @@ impl SpriteSheet {
             )))
         })?;
 
-        let walk_frames_vec: Vec<_> = (0..8)
-            .map(|i| -> Result<[Texture; 4], image::ImageError> {
-                let frames =
-                    Self::load_animation_frames(&img, 1, 142 + i * 93, 4, 4, 91, 92, 1, 1)?;
-                frames.try_into().map_err(|_| {
-                    image::ImageError::Parameter(ParameterError::from_kind(
-                        ParameterErrorKind::Generic("Incorrect number of walk frames".into()),
-                    ))
+        let walk_frames_vec: Vec<_> ;
+        if path.contains("rott") {
+            walk_frames_vec = (0..8)
+                .map(|i| -> Result<[Texture; 4], image::ImageError> {
+                    let frames =
+                        Self::load_animation_frames(&img, 1, 142 + i * 93, 4, 4, 91, 92, 1, 1)?;
+                    frames.try_into().map_err(|_| {
+                        image::ImageError::Parameter(ParameterError::from_kind(
+                            ParameterErrorKind::Generic("Incorrect number of walk frames".into()),
+                        ))
+                    })
                 })
-            })
-            .collect::<Result<Vec<[Texture; 4]>, _>>()?;
+                .collect::<Result<Vec<[Texture; 4]>, _>>()?;
+        } else {
+
+            // blob1.png spritesheet frames are 276 x 338 pixels each with 4 vertical and 2 horizontal lines of pixels in between.
+            walk_frames_vec = (0..8)
+                .map(|i| -> Result<[Texture; 4], image::ImageError> {
+                    let frames =
+                        Self::load_animation_frames(&img, 1, 342 + i * 340, 4, 4, 276, 338, 4, 2)?;
+                    frames.try_into().map_err(|_| {
+                        image::ImageError::Parameter(ParameterError::from_kind(
+                            ParameterErrorKind::Generic("Incorrect number of walk frames".into()),
+                        ))
+                    })
+                })
+                .collect::<Result<Vec<[Texture; 4]>, _>>()?;
+        }
 
         let walk_frames: [[Texture; 4]; 8] = walk_frames_vec.try_into().map_err(|_| {
             image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic(
