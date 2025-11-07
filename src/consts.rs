@@ -9,10 +9,11 @@ pub const MOUSE_SPEED: f32 = 0.06;
 pub const CAMERA_HEIGHT_OFFSET: f32 = 0.1;
 pub const CYAN_TRANSPARENT: Rgba<u8> = Rgba([0, 255, 255, 255]);
 
-pub const DEFAULT_PLAYER_MOVE_SPEED: f32 = 0.05;
+pub const DEFAULT_PLAYER_MOVE_SPEED: f32 = 0.035;
 pub const DEFAULT_PLAYER_ROT_SPEED: f32 = 0.03;
 pub const PLAYER_JUMP_VELOCITY: f32 = 0.028;
 pub const PLAYER_PITCH_LIMIT: f32 = std::f32::consts::PI / 2.5;
+pub const PLAYER_SPRINT_SPEED_MULTIPLIER: f32 = 1.5;
 
 pub const MINIMAP_WIDTH: usize = 150;
 pub const MINIMAP_HEIGHT: usize = 150;
