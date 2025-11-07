@@ -29,7 +29,7 @@ fn main() -> std::io::Result<()> {
                 Ok((amt, src)) => {
                     let client_message: ClientMessage = bincode::deserialize(&buf[..amt]).unwrap();
 
-                    if let Some((id, _, last_seen)) = clients.get_mut(&src) {
+                    if let Some((_, _, last_seen)) = clients.get_mut(&src) {
                         *last_seen = Instant::now();
                     }
 
@@ -112,16 +112,26 @@ fn main() -> std::io::Result<()> {
         // Remove timed out clients
         let now = Instant::now();
         let timeout = Duration::from_secs(5);
+        let mut timed_out_clients = Vec::new();
         clients.retain(|_, (id, username, last_seen)| {
             if now.duration_since(*last_seen) > timeout {
                 println!("Client {} ({}) timed out.", id, username);
-                game_state.players.remove(&id.to_string());
-                client_inputs.remove(id);
+                timed_out_clients.push(*id);
                 false
             } else {
                 true
             }
         });
+
+        for id in timed_out_clients {
+            game_state.players.remove(&id.to_string());
+            client_inputs.remove(&id);
+            let player_left_message = ServerMessage::PlayerLeft(id);
+            let encoded_message = bincode::serialize(&player_left_message).unwrap();
+            for client_addr in clients.keys() {
+                socket.send_to(&encoded_message, client_addr).unwrap();
+            }
+        }
 
         // Game logic update and broadcast
         let now = Instant::now();

@@ -304,6 +304,11 @@ fn main() -> Result<()> {
                                     }
                                 }
                             }
+                            ServerMessage::PlayerLeft(id) => {
+                                if let Some(ref mut gs) = game_state {
+                                    gs.players.remove(&id.to_string());
+                                }
+                            }
                             _ => {}
                         }
                     }
