@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
+use rand::Rng;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct World {
@@ -7,9 +8,11 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(id: Option<usize>) -> Self {
+    pub fn new(id: Option<usize>, name: Option<&str>) -> Self {
         let map_id = id.unwrap_or(1);
+        let map_name = name.unwrap_or("map1");
         match map_id {
+            0 => Self::parse_from_file(&format!("maps/{}.toml", map_name)),
             1 => Self::parse_from_file("maps/map1.toml"),
             2 => Self::parse_from_file("maps/map2.toml"),
             3 => Self::parse_from_file("maps/map3.toml"),
@@ -24,6 +27,19 @@ impl World {
             .unwrap_or_else(|e| panic!("Failed to parse TOML map file {}: {}", path, e));
         world
     }
+
+    // Unused for now
+/*     pub fn generate_random_map() -> Self {
+        let mut map = Vec::new();
+        for _ in 0..10 {
+            let mut row = Vec::new();
+            for _ in 0..10 {
+                row.push(rand::rng().random_range(0..2));
+            }
+            map.push(row);
+        }
+        Self { map }
+    } */
 
     pub fn get_tile(&self, x: usize, y: usize) -> u8 {
         if self.map.is_empty() {

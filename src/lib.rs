@@ -244,11 +244,15 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub fn new(map_id: Option<usize>) -> Self {
-        let map_id = map_id.unwrap_or(1);
+    pub fn new(map_identifier: Option<crate::flags::MapIdentifier>) -> Self {
+        let world = match map_identifier {
+            Some(crate::flags::MapIdentifier::Id(id)) => World::new(Some(id), None),
+            Some(crate::flags::MapIdentifier::Name(name)) => World::new(Some(0), Some(&name)),
+            None => World::new(Some(1), None),
+        };
         GameState {
             players: HashMap::new(),
-            world: World::new(Some(map_id)),
+            world,
         }
     }
 
