@@ -9,7 +9,7 @@ use winit::dpi::LogicalSize;
 use winit::event::{DeviceEvent, Event, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
-use winit::window::WindowBuilder;
+use winit::window::{CursorGrabMode, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
@@ -30,7 +30,7 @@ fn main() -> Result<()> {
     socket.connect(&server_address)?;
     socket.set_nonblocking(true)?;
 
-    let mut buf = [0; 1024];
+    let mut buf = [0; 2048];
     let mut my_id: Option<u64> = None;
 
     // Outer loop: continue until successfully connected
@@ -107,10 +107,11 @@ fn main() -> Result<()> {
             .build(&event_loop)?
     });
 
+    let mut cursor_grabbed = true;
     window.set_cursor_visible(false);
     window
-        .set_cursor_grab(winit::window::CursorGrabMode::Confined)
-        .or_else(|_e| window.set_cursor_grab(winit::window::CursorGrabMode::Locked))
+        .set_cursor_grab(CursorGrabMode::Confined)
+        .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
         .unwrap();
 
     let mut pixels = {
@@ -121,8 +122,9 @@ fn main() -> Result<()> {
 
     let mut texture_manager = TextureManager::new();
     fps::textures::load_game_textures(&mut texture_manager)?;
+    let sprite_sheet = fps::spritesheet::SpriteSheet::new("assets/rott-ianpaulfreeley.png")?;
 
-    let mut renderer = Renderer::new(texture_manager);
+    let mut renderer = Renderer::new(texture_manager, sprite_sheet);
     let mut game_state: Option<GameState> = None;
 
     let mut frame_count = 0;
@@ -131,20 +133,44 @@ fn main() -> Result<()> {
     let mut mouse_dx = 0.0;
     let mut mouse_dy = 0.0;
     let mut prev_input: Option<Input> = None;
+    let mut focused = false;
+    let mut last_frame_time = Instant::now();
 
     Ok(event_loop.run(move |event, elwt| {
+        let delta_time = last_frame_time.elapsed().as_secs_f32();
+        last_frame_time = Instant::now();
+
+        if let Some(gs) = &mut game_state {
+            for player in gs.players.values_mut() {
+                if player.animation_state == fps::AnimationState::Walking {
+                    player.frame_timer += delta_time;
+                    if player.frame_timer > 0.150 {
+                        player.frame_timer = 0.0;
+                        player.frame = (player.frame + 1) % 4;
+                    }
+                } else {
+                    player.frame = 0;
+                }
+            }
+        }
+
         match &event {
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
-                mouse_dx = delta.0 as f32;
-                mouse_dy = delta.1 as f32;
+                if cursor_grabbed && focused {
+                    mouse_dx = delta.0 as f32;
+                    mouse_dy = delta.1 as f32;
+                }
             }
             Event::WindowEvent { event, .. } => match event {
                 WindowEvent::CloseRequested => {
                     elwt.exit();
                     return;
+                }
+                WindowEvent::Focused(is_focused) => {
+                    focused = *is_focused;
                 }
                 WindowEvent::RedrawRequested => {
                     if let Some(ref gs) = game_state {
@@ -174,6 +200,26 @@ fn main() -> Result<()> {
             if input.key_pressed(KeyCode::Escape) || input.close_requested() {
                 elwt.exit();
                 return;
+            }
+
+            if input.key_pressed(KeyCode::Tab) {
+                cursor_grabbed = !cursor_grabbed;
+                window_clone.set_cursor_visible(!cursor_grabbed);
+                let grab_mode = if cursor_grabbed {
+                    CursorGrabMode::Confined
+                } else {
+                    CursorGrabMode::None
+                };
+                window_clone
+                    .set_cursor_grab(grab_mode)
+                    .or_else(|_e| {
+                        if cursor_grabbed {
+                            window_clone.set_cursor_grab(CursorGrabMode::Locked)
+                        } else {
+                            window_clone.set_cursor_grab(CursorGrabMode::None)
+                        }
+                    })
+                    .unwrap();
             }
 
             let mut turn = mouse_dx * MOUSE_SPEED;
@@ -206,7 +252,7 @@ fn main() -> Result<()> {
             }
         }
 
-        let mut buf = [0; 1024];
+        let mut buf = [0; 2048];
 
         loop {
             match socket.recv(&mut buf) {
@@ -229,6 +275,8 @@ fn main() -> Result<()> {
                                             player.z = update.z;
                                             player.angle = update.angle;
                                             player.pitch = update.pitch;
+                                            player.texture = update.texture;
+                                            player.animation_state = update.animation_state;
                                         } else {
                                             // New player joined — insert into local game state
                                             let mut p = fps::Player::new();
@@ -237,7 +285,10 @@ fn main() -> Result<()> {
                                             p.z = update.z;
                                             p.angle = update.angle;
                                             p.pitch = update.pitch;
-                                            gs.players.insert(id, p);
+                                            p.texture = update.texture;
+                                            p.animation_state = update.animation_state;
+                                            p.direction = fps::Direction::Front;
+                                            gs.players.insert(id.clone(), p);
                                         }
                                     }
                                 }

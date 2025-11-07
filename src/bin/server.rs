@@ -116,7 +116,7 @@ fn main() -> std::io::Result<()> {
             for player in game_state.players.values_mut() {
                 player.z += player.velocity_z;
                 if player.z > 0.0 {
-                    player.velocity_z -= 0.001;
+                    player.velocity_z -= 0.0012;
                 } else {
                     player.velocity_z = 0.0;
                     player.z = 0.0;
@@ -124,7 +124,7 @@ fn main() -> std::io::Result<()> {
             }
 
             // Prepare and send game update to all clients
-            let mut player_updates = HashMap::new();
+            let mut player_updates = HashMap::<String, PlayerUpdate>::new();
             for (id, player) in &game_state.players {
                 player_updates.insert(
                     id.clone(),
@@ -134,6 +134,8 @@ fn main() -> std::io::Result<()> {
                         z: player.z,
                         angle: player.angle,
                         pitch: player.pitch,
+                        texture: player.texture.clone(),
+                        animation_state: player.animation_state.clone(),
                     },
                 );
             }

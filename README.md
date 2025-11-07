@@ -41,3 +41,4 @@ The game window will open, and you can start playing. The client captures your k
 - **Space:** Jump
 - **Arrow Keys**: Simple movement
 - **Escape:** Exit the game
+- **Tab:** Unlock and lock cursor
