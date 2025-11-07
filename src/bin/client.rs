@@ -316,6 +316,11 @@ fn main() -> Result<()> {
                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
                     break;
                 }
+                Err(ref e) if e.kind() == io::ErrorKind::ConnectionRefused => {
+                    eprintln!("Connection to the server was lost.");
+                    elwt.exit();
+                    return;
+                }
                 Err(e) => {
                     eprintln!("Error receiving data: {}", e);
                     break;
