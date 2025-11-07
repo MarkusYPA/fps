@@ -96,6 +96,17 @@ fn main() -> Result<()> {
 
     let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
 
+    let socket_clone = socket.try_clone()?;
+    std::thread::spawn(move || loop {
+        let ping_message = ClientMessage::Ping;
+        let encoded = bincode::serialize(&ping_message).unwrap();
+        if let Err(e) = socket_clone.send(&encoded) {
+            eprintln!("Error sending ping: {}", e);
+            break;
+        }
+        std::thread::sleep(Duration::from_secs(1));
+    });
+
     let event_loop = EventLoop::new()?;
     let mut input = WinitInputHelper::new();
     let window = Arc::new({
