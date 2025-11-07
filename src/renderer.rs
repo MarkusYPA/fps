@@ -27,6 +27,7 @@ pub struct Renderer {
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
     pub sprite_sheet: SpriteSheet,
+    pub sprite_sheet_test: SpriteSheet,
     pub sprites: Vec<Sprite>,
 }
 
@@ -42,7 +43,7 @@ struct SpriteInfo<'a> {
 }
 
 impl Renderer {
-    pub fn new(texture_manager: TextureManager, sprite_sheet: SpriteSheet) -> Self {
+    pub fn new(texture_manager: TextureManager, sprite_sheet: SpriteSheet, sprite_sheet_test: SpriteSheet) -> Self {
         let sprites = vec![
             Sprite {
                 x: 3.2,
@@ -66,6 +67,7 @@ impl Renderer {
             z_buffer: vec![0.0; WIDTH],
             texture_manager,
             sprite_sheet,
+            sprite_sheet_test,
             sprites,
         }
     }

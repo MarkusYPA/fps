@@ -133,9 +133,10 @@ fn main() -> Result<()> {
 
     let mut texture_manager = TextureManager::new();
     fps::textures::load_game_textures(&mut texture_manager)?;
-    let sprite_sheet = fps::spritesheet::SpriteSheet::new("assets/rott-ianpaulfreeley.png")?;
+    let sprite_sheet_ipf = fps::spritesheet::SpriteSheet::new("assets/rott-ianpaulfreeley.png")?;
+    let sprite_sheet_blob = fps::spritesheet::SpriteSheet::new("assets/blob1.png")?;
 
-    let mut renderer = Renderer::new(texture_manager, sprite_sheet);
+    let mut renderer = Renderer::new(texture_manager, sprite_sheet_ipf, sprite_sheet_blob);
     let mut game_state: Option<GameState> = None;
 
     let mut frame_count = 0;

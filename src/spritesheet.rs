@@ -12,10 +12,20 @@ pub struct SpriteSheet {
 
 impl SpriteSheet {
     pub fn new(path: &str) -> Result<Self, image::ImageError> {
-        let img = image::open(path)?;
+        let mut img = image::open(path)?;
+        let mut idle_frames_vec = Vec::new();
 
-        // rott-ianpaulfreeley.png spritesheet frames are 91x92 pixels each with one line of pixels in between. Rows start at somewhat arbitrary places.
-        let idle_frames_vec = Self::load_animation_frames(&img, 1, 34, 8, 8, 91, 92)?;
+        if path.contains("rott") {
+            // rott-ianpaulfreeley.png spritesheet frames are 91x92 pixels each with one line of pixels in between. Rows start at somewhat arbitrary places.
+            idle_frames_vec = Self::load_animation_frames(&img, 1, 34, 8, 8, 91, 92)?;
+        } else {
+            // blob1.png spritesheet frames are 138x184 pixels each with two lines of pixels in between.
+            idle_frames_vec = Self::load_animation_frames(&img, 1, 1, 8, 8, 138, 184)?;
+
+            // set img to one compatible with the walking frames for now
+            img = image::open("assets/rott-ianpaulfreeley.png")?;
+        }
+
         let idle_frames: [Texture; 8] = idle_frames_vec.try_into().map_err(|_| {
             image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic(
                 "Incorrect number of idle frames".into(),
