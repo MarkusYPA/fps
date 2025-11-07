@@ -1,33 +1,76 @@
-use crate::{GameState, HEIGHT, WIDTH, textures::TextureManager};
+use crate::textures::{self};
+use crate::{
+    Direction, GameState, HEIGHT, Sprite, WIDTH, spritesheet::SpriteSheet, textures::TextureManager,
+};
+
+const CAMERA_HEIGHT_OFFSET: f32 = 0.1;
+
+fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
+    let angle_diff = ((player_angle - camera_angle).to_degrees() + 180.0).rem_euclid(360.0);
+    let direction_index = (angle_diff / 45.0).round() as usize % 8;
+
+    match direction_index {
+        0 => Direction::Front,
+        1 => Direction::FrontRight,
+        2 => Direction::Right,
+        3 => Direction::BackRight,
+        4 => Direction::Back,
+        5 => Direction::BackLeft,
+        6 => Direction::Left,
+        7 => Direction::FrontLeft,
+        _ => unreachable!(),
+    }
+}
 
 pub struct Renderer {
     pub buffer: Vec<u32>,
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
+    pub sprite_sheet: SpriteSheet,
+    pub sprites: Vec<Sprite>,
+}
+
+struct SpriteInfo<'a> {
+    x: f32,
+    y: f32,
+    z: f32,
+    texture: &'a String,
+    width: f32,
+    height: f32,
+    dist_sq: f32,
+    frame: Option<&'a textures::Texture>,
 }
 
 impl Renderer {
-    pub fn new(texture_manager: TextureManager) -> Self {
+    pub fn new(texture_manager: TextureManager, sprite_sheet: SpriteSheet) -> Self {
+        let sprites = vec![
+            Sprite {
+                x: 3.2,
+                y: 4.3,
+                z: 0.0,
+                texture: "character2".to_string(),
+                width: 0.2,
+                height: 0.7,
+            },
+            Sprite {
+                x: 4.2,
+                y: 4.3,
+                z: 0.0,
+                texture: "character3".to_string(),
+                width: 0.2,
+                height: 0.7,
+            },
+        ];
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT],
             z_buffer: vec![0.0; WIDTH],
             texture_manager,
+            sprite_sheet,
+            sprites,
         }
     }
 
     pub fn render(&mut self, game_state: &GameState, my_id: u64) {
-        // Clear the buffer with ceiling and floor colors
-        for y in 0..HEIGHT / 2 {
-            for x in 0..WIDTH {
-                self.buffer[y * WIDTH + x] = 0x00AACCFF; // Ceiling
-            }
-        }
-        for y in HEIGHT / 2..HEIGHT {
-            for x in 0..WIDTH {
-                self.buffer[y * WIDTH + x] = 0x00555555; // Floor
-            }
-        }
-
         if let Some(player) = game_state.players.get(&my_id.to_string()) {
             let pitch_offset = (player.pitch * HEIGHT as f32 / 2.0) as isize;
             let horizon = (HEIGHT as isize / 2 + pitch_offset).clamp(0, HEIGHT as isize) as usize;
@@ -43,11 +86,15 @@ impl Renderer {
                     self.buffer[y * WIDTH + x] = 0x00555555; // Floor
                 }
             }
+
+            // cast one ray for each pixel in width
             for x in 0..WIDTH {
+                // ray direction
                 let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
                 let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
                 let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
 
+                // direction and steps to measure if wall was hit
                 let mut map_x = player.x as usize;
                 let mut map_y = player.y as usize;
 
@@ -74,6 +121,7 @@ impl Renderer {
                     wall_dist_y = (map_y as f32 + 1.0 - player.y) * delta_dist_y;
                 }
 
+                // find wall hits
                 let mut hit = false;
                 let mut wall_type = 0;
                 while !hit {
@@ -92,6 +140,7 @@ impl Renderer {
                     }
                 }
 
+                // how far wall hit was
                 let perp_wall_dist = if wall_type == 0 {
                     (map_x as f32 - player.x + (1.0 - step_x as f32) / 2.0) / ray_dir_x
                 } else {
@@ -100,8 +149,9 @@ impl Renderer {
 
                 self.z_buffer[x] = perp_wall_dist;
 
+                // line hight from distance, start and end points account for jump, pitch and camera offset
                 let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-                let z_offset = (player.z * line_height as f32) as isize;
+                let z_offset = ((player.z + CAMERA_HEIGHT_OFFSET) * line_height as f32) as isize;
                 let draw_start = (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
                     .clamp(0, HEIGHT as isize - 1) as usize;
                 let draw_end = (line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
@@ -113,30 +163,69 @@ impl Renderer {
                     0x00695A41
                 };
 
+                // save vertical wall line to buffer
                 for y in draw_start..draw_end {
                     self.buffer[y * WIDTH + x] = wall_color;
                 }
             }
 
-            // Sprite rendering
-
-            // Sort sprites by distance
-            let mut sprites_with_dist: Vec<_> = game_state
+            // sprites from world
+            let mut sprite_infos: Vec<SpriteInfo> = self
                 .sprites
                 .iter()
-                .map(|sprite| {
-                    let sprite_x = sprite.x - player.x;
-                    let sprite_y = sprite.y - player.y;
-                    let dist_sq = sprite_x * sprite_x + sprite_y * sprite_y;
-                    (sprite, dist_sq)
+                .map(|s| {
+                    let sprite_x = s.x - player.x;
+                    let sprite_y = s.y - player.y;
+                    SpriteInfo {
+                        x: s.x,
+                        y: s.y,
+                        z: s.z,
+                        texture: &s.texture,
+                        width: s.width,
+                        height: s.height,
+                        dist_sq: sprite_x * sprite_x + sprite_y * sprite_y,
+                        frame: None,
+                    }
                 })
                 .collect();
-            sprites_with_dist
-                .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-            for (sprite, _) in sprites_with_dist {
-                let sprite_x = sprite.x - player.x;
-                let sprite_y = sprite.y - player.y;
+            // sprites from other players
+            for (id, other_player) in &game_state.players {
+                if id != &my_id.to_string() {
+                    let direction = get_direction(other_player.angle, player.angle);
+                    let frame = match other_player.animation_state {
+                        crate::AnimationState::Idle => &self.sprite_sheet.idle[direction as usize],
+                        crate::AnimationState::Walking => {
+                            &self.sprite_sheet.walk[direction as usize][other_player.frame]
+                        }
+                    };
+
+                    let sprite_x = other_player.x - player.x;
+                    let sprite_y = other_player.y - player.y;
+                    sprite_infos.push(SpriteInfo {
+                        x: other_player.x,
+                        y: other_player.y,
+                        z: other_player.z,
+                        texture: &other_player.texture,
+                        width: 0.5,
+                        height: 0.7,
+                        dist_sq: sprite_x * sprite_x + sprite_y * sprite_y,
+                        frame: Some(frame),
+                    });
+                }
+            }
+
+            // Sort sprites by distance
+            sprite_infos.sort_by(|a, b| {
+                b.dist_sq
+                    .partial_cmp(&a.dist_sq)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            // sprites to buffer
+            for sprite_info in sprite_infos {
+                let sprite_x = sprite_info.x - player.x;
+                let sprite_y = sprite_info.y - player.y;
 
                 let dir_x = player.angle.cos();
                 let dir_y = player.angle.sin();
@@ -145,20 +234,23 @@ impl Renderer {
                 let plane_y = dir_x * 0.66;
 
                 let inv_det = 1.0 / (plane_x * dir_y - dir_x * plane_y);
-
                 let transform_x = inv_det * (dir_y * sprite_x - dir_x * sprite_y);
                 let transform_y = inv_det * (-plane_y * sprite_x + plane_x * sprite_y);
 
+                // only draw sprites in front of the player
                 if transform_y > 0.0 {
-                    // only draw sprites in front of the player
                     let sprite_screen_x = (WIDTH as f32 / 2.0) * (1.0 + transform_x / transform_y);
 
-                    let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite.height;
+                    // put sprite on the floor if its z is 0
+                    let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite_info.height;
                     let world_half = (HEIGHT as f32 / transform_y).abs() * 0.5;
-                    let sprite_vertical_offset =
-                        (player.z - sprite.z) * HEIGHT as f32 / transform_y - sprite_height * 0.5
-                            + world_half;
+                    let sprite_vertical_offset = (player.z + CAMERA_HEIGHT_OFFSET - sprite_info.z)
+                        * HEIGHT as f32
+                        / transform_y
+                        - sprite_height * 0.5
+                        + world_half;
 
+                    // start and end points with both z:s, pitch and camera offset accounted for
                     let draw_start_y = (-sprite_height / 2.0
                         + HEIGHT as f32 / 2.0
                         + pitch_offset as f32
@@ -170,34 +262,44 @@ impl Renderer {
                         + sprite_vertical_offset)
                         .min(HEIGHT as f32) as usize;
 
-                    let sprite_width = (WIDTH as f32 / transform_y).abs() * sprite.width;
+                    let sprite_width = (WIDTH as f32 / transform_y).abs() * sprite_info.width;
                     let draw_start_x = (sprite_screen_x - sprite_width / 2.0).max(0.0) as usize;
                     let draw_end_x =
                         (sprite_screen_x + sprite_width / 2.0).min(WIDTH as f32) as usize;
 
-                    if let Some(texture) = self.texture_manager.get_texture(&sprite.texture) {
+                    // animation frames or static sprites
+                    if let Some(raster) = sprite_info
+                        .frame
+                        .or_else(|| self.texture_manager.get_texture(sprite_info.texture))
+                    {
+                        // process vertical lines
                         for stripe in draw_start_x..draw_end_x {
+                            // proceed if line is closer than any wall there
                             if transform_y < self.z_buffer[stripe] {
                                 let tex_x =
                                     ((stripe as f32 - (sprite_screen_x - sprite_width / 2.0))
-                                        * texture.width as f32
+                                        * raster.width as f32
                                         / sprite_width) as u32;
 
+                                // get pixels on the vertical line
                                 for y in draw_start_y..draw_end_y {
                                     let tex_y = ((y as f32
                                         - (HEIGHT as f32 / 2.0 - sprite_height / 2.0
                                             + pitch_offset as f32
                                             + sprite_vertical_offset as f32))
-                                        * texture.height as f32
+                                        * raster.height as f32
                                         / sprite_height)
                                         as u32;
 
-                                    let color =
-                                        texture.pixels[(tex_y * texture.width + tex_x) as usize];
-                                    let alpha = (color >> 24) & 0xFF;
+                                    if tex_x < raster.width && tex_y < raster.height {
+                                        let color =
+                                            raster.pixels[(tex_y * raster.width + tex_x) as usize];
+                                        let alpha = (color >> 24) & 0xFF;
 
-                                    if alpha > 0 {
-                                        self.buffer[y * WIDTH + stripe] = color;
+                                        // save to renderer buffer
+                                        if alpha > 0 {
+                                            self.buffer[y * WIDTH + stripe] = color;
+                                        }
                                     }
                                 }
                             }
