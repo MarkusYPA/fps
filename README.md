@@ -52,6 +52,7 @@ cargo run --release --bin server -- -m 3
 - **WASD Keys:** Move
 - **Mouse:** Turn
 - **Space:** Jump
+- **Shift:** Sprint
 - **Arrow Keys**: Simple movement
 - **Escape:** Exit the game
 - **Tab:** Unlock and lock cursor
