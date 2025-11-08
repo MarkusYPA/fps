@@ -105,7 +105,7 @@ impl Player {
             velocity_z: 0.0,
             move_speed: DEFAULT_PLAYER_MOVE_SPEED,
             rot_speed: DEFAULT_PLAYER_ROT_SPEED,
-            texture: "character4".to_string(),
+            texture: "teal".to_string(),
             animation_state: AnimationState::Idle,
             direction: Direction::Front,
             frame: 0,

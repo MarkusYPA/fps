@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::collections::HashMap;
 use std::io::{self, Write};
 use std::net::UdpSocket;
 use std::sync::Arc;
@@ -133,12 +134,14 @@ fn main() -> Result<()> {
         Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
     };
 
+    // define all necessary spritesheets
     let mut texture_manager = TextureManager::new();
     fps::textures::load_game_textures(&mut texture_manager)?;
-    let sprite_sheet_ipf = fps::spritesheet::SpriteSheet::new("assets/rott-ianpaulfreeley.png")?;
-    let sprite_sheet_blob = fps::spritesheet::SpriteSheet::new("assets/blob1.png")?;
+    let mut spritesheets = HashMap::new();
+    // key matches player's texture property
+    spritesheets.insert("teal".to_owned(), fps::spritesheet::SpriteSheet::new("assets/blob1.png")?);
 
-    let mut renderer = Renderer::new(texture_manager, sprite_sheet_ipf, sprite_sheet_blob);
+    let mut renderer = Renderer::new(texture_manager, spritesheets);
     let mut game_state: Option<GameState> = None;
 
     let mut frame_count = 0;

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::textures::{self};
 use crate::{
     Direction, GameState, Sprite,
@@ -31,8 +33,9 @@ pub struct Renderer {
     pub buffer: Vec<u32>,
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
-    pub sprite_sheet: SpriteSheet,
-    pub sprite_sheet_test: SpriteSheet,
+    //pub sprite_sheet: SpriteSheet,
+    //pub sprite_sheet_test: SpriteSheet,
+    pub sprite_sheets: HashMap<String, SpriteSheet>,
     pub sprites: Vec<Sprite>,
 }
 
@@ -48,7 +51,11 @@ struct SpriteInfo<'a> {
 }
 
 impl Renderer {
-    pub fn new(texture_manager: TextureManager, sprite_sheet: SpriteSheet, sprite_sheet_test: SpriteSheet) -> Self {
+    //pub fn new(texture_manager: TextureManager, sprite_sheet: SpriteSheet, sprite_sheet_test: SpriteSheet) -> Self {
+    pub fn new(
+        texture_manager: TextureManager,
+        sprite_sheets: HashMap<String, SpriteSheet>,
+    ) -> Self {
         let sprites = vec![
             Sprite {
                 x: 3.2,
@@ -71,8 +78,9 @@ impl Renderer {
             buffer: vec![0; WIDTH * HEIGHT],
             z_buffer: vec![0.0; WIDTH],
             texture_manager,
-            sprite_sheet,
-            sprite_sheet_test,
+            //sprite_sheet,
+            //sprite_sheet_test,
+            sprite_sheets,
             sprites,
         }
     }
@@ -203,11 +211,13 @@ impl Renderer {
                 if id != &my_id.to_string() {
                     let direction = get_direction(other_player.angle, player.angle);
                     let frame = match other_player.animation_state {
-                        //crate::AnimationState::Idle => &self.sprite_sheet.idle[direction as usize],
-                        crate::AnimationState::Idle => &self.sprite_sheet_test.idle[direction as usize],
+                        crate::AnimationState::Idle => {
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().idle
+                                [direction as usize]
+                        }
                         crate::AnimationState::Walking => {
-                            //&self.sprite_sheet.walk[direction as usize][other_player.frame]
-                            &self.sprite_sheet_test.walk[direction as usize][other_player.frame]
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().walk
+                                [direction as usize][other_player.frame]
                         }
                     };
 
