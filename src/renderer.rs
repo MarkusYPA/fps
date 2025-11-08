@@ -2,10 +2,10 @@ use std::collections::HashMap;
 
 use crate::textures::{self};
 use crate::{
-    Direction, GameState, Sprite,
+    Direction, GameState,
     consts::{
         CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, FLOOR_COLOR, HEIGHT,
-        SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
+        SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
         WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
     },
     spritesheet::SpriteSheet,
@@ -36,7 +36,7 @@ pub struct Renderer {
     //pub sprite_sheet: SpriteSheet,
     //pub sprite_sheet_test: SpriteSheet,
     pub sprite_sheets: HashMap<String, SpriteSheet>,
-    pub sprites: Vec<Sprite>,
+    //pub sprites: Vec<Sprite>,
 }
 
 struct SpriteInfo<'a> {
@@ -56,32 +56,12 @@ impl Renderer {
         texture_manager: TextureManager,
         sprite_sheets: HashMap<String, SpriteSheet>,
     ) -> Self {
-        let sprites = vec![
-            Sprite {
-                x: 3.2,
-                y: 4.3,
-                z: 0.0,
-                texture: "character2".to_string(),
-                width: SPRITE_NPC_WIDTH,
-                height: SPRITE_NPC_HEIGHT,
-            },
-            Sprite {
-                x: 4.2,
-                y: 4.3,
-                z: 0.0,
-                texture: "character3".to_string(),
-                width: SPRITE_NPC_WIDTH,
-                height: SPRITE_NPC_HEIGHT,
-            },
-        ];
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT],
             z_buffer: vec![0.0; WIDTH],
             texture_manager,
-            //sprite_sheet,
-            //sprite_sheet_test,
             sprite_sheets,
-            sprites,
+            //sprites,
         }
     }
 
@@ -187,7 +167,7 @@ impl Renderer {
             }
 
             // sprites from world
-            let mut sprite_infos: Vec<SpriteInfo> = self
+            let mut sprite_infos: Vec<SpriteInfo> = game_state
                 .sprites
                 .iter()
                 .map(|s| {

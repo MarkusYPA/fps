@@ -139,7 +139,10 @@ fn main() -> Result<()> {
     fps::textures::load_game_textures(&mut texture_manager)?;
     let mut spritesheets = HashMap::new();
     // key matches player's texture property
-    spritesheets.insert("teal".to_owned(), fps::spritesheet::SpriteSheet::new("assets/blob1.png")?);
+    spritesheets.insert(
+        "teal".to_owned(),
+        fps::spritesheet::SpriteSheet::new("assets/blob1.png")?,
+    );
 
     let mut renderer = Renderer::new(texture_manager, spritesheets);
     let mut game_state: Option<GameState> = None;

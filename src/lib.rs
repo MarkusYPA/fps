@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::consts::{
     DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, PLAYER_JUMP_VELOCITY, PLAYER_PITCH_LIMIT,
-    PLAYER_RADIUS, PLAYER_SPRINT_SPEED_MULTIPLIER,
+    PLAYER_RADIUS, PLAYER_SPRINT_SPEED_MULTIPLIER, SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH,
 };
 
 pub mod consts;
@@ -243,6 +243,7 @@ pub struct Sprite {
 pub struct GameState {
     pub players: HashMap<String, Player>,
     pub world: World,
+    pub sprites: Vec<Sprite>,
 }
 
 impl GameState {
@@ -252,9 +253,28 @@ impl GameState {
             Some(crate::flags::MapIdentifier::Name(name)) => World::new(Some(0), Some(&name)),
             None => World::new(Some(1), None),
         };
+        let sprites = vec![
+            Sprite {
+                x: 3.2,
+                y: 4.3,
+                z: 0.0,
+                texture: "character2".to_string(),
+                width: SPRITE_NPC_WIDTH,
+                height: SPRITE_NPC_HEIGHT,
+            },
+            Sprite {
+                x: 4.2,
+                y: 4.3,
+                z: 0.0,
+                texture: "character3".to_string(),
+                width: SPRITE_NPC_WIDTH,
+                height: SPRITE_NPC_HEIGHT,
+            },
+        ];
         GameState {
             players: HashMap::new(),
             world,
+            sprites,
         }
     }
 
