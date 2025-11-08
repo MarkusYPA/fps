@@ -249,6 +249,7 @@ fn main() -> Result<()> {
                 turn,
                 pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
                 jump: input.key_pressed(KeyCode::Space),
+                sprint: input.key_held(KeyCode::ShiftLeft),
             };
             mouse_dx = 0.0;
             mouse_dy = 0.0;

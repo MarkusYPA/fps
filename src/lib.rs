@@ -7,6 +7,7 @@ use crate::consts::{
     DEFAULT_PLAYER_ROT_SPEED,
     PLAYER_JUMP_VELOCITY,
     PLAYER_PITCH_LIMIT,
+    PLAYER_SPRINT_SPEED_MULTIPLIER,
 };
 
 pub mod consts;
@@ -76,6 +77,7 @@ pub struct Input {
     pub turn: f32,
     pub pitch: f32,
     pub jump: bool,
+    pub sprint: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -140,9 +142,15 @@ impl Player {
             new_x += strafe_x * self.move_speed * slower;
             new_y += strafe_y * self.move_speed * slower;
         }
+
         if input.left {
             new_x -= strafe_x * self.move_speed * slower;
             new_y -= strafe_y * self.move_speed * slower;
+        }
+
+        if input.sprint {
+            new_x += self.angle.cos() * self.move_speed * PLAYER_SPRINT_SPEED_MULTIPLIER * slower;
+            new_y += self.angle.sin() * self.move_speed * PLAYER_SPRINT_SPEED_MULTIPLIER * slower;
         }
 
         self.check_collision_and_move(new_x, new_y, world);
