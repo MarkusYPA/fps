@@ -133,12 +133,10 @@ pub fn hue_variations(path: &str) {
     for i in 1..10 {
         let out = format!("assets/blob{i}.png");
         if std::path::Path::new(&out).exists() {
-            println!("{} exists", out);
             continue;
         }
 
         let degrees = 360.0 * (i as f32 / 10.0);
-        println!("giving it {} degrees", degrees);
         let shifted = shift_hue(&base, degrees);
         shifted.save(&out).unwrap();
     }

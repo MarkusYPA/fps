@@ -95,7 +95,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new() -> Self {
+    pub fn new(texturename: String) -> Self {
         Player {
             x: 1.5,
             y: 1.5,
@@ -105,7 +105,7 @@ impl Player {
             velocity_z: 0.0,
             move_speed: DEFAULT_PLAYER_MOVE_SPEED,
             rot_speed: DEFAULT_PLAYER_ROT_SPEED,
-            texture: "1".to_string(),
+            texture: texturename,
             animation_state: AnimationState::Idle,
             direction: Direction::Front,
             frame: 0,

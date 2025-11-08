@@ -135,29 +135,20 @@ fn main() -> Result<()> {
         Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
     };
 
-    // generate hue variations of the spritesheet
+    // generate hue variations of the spritesheet, if they don't already exist
     hue_variations("assets/blob0.png");
 
-    println!("variations done");
-
-    // define all necessary spritesheets
+    // define spritesheets
     let mut texture_manager = TextureManager::new();
     fps::textures::load_game_textures(&mut texture_manager)?;
-
-    println!("loaded textures");
-
-    let mut spritesheets = HashMap::new();
-    // key matches player's texture property
+    let mut spritesheets = HashMap::new();    
     for i in 0..10 {
         spritesheets.insert(
-            format!("{i}"),
+            format!("{i}"), // key matches a player's texture property
             fps::spritesheet::SpriteSheet::new(&format!("assets/blob{i}.png"))?,
         );
     }
     let mut renderer = Renderer::new(texture_manager, spritesheets);
-
-    println!("renderer sheets: {:?}", renderer.sprite_sheets.keys());
-
     let mut game_state: Option<GameState> = None;
 
     let mut frame_count = 0;
@@ -313,7 +304,7 @@ fn main() -> Result<()> {
                                             player.animation_state = update.animation_state;
                                         } else {
                                             // New player joined — insert into local game state
-                                            let mut p = fps::Player::new();
+                                            let mut p = fps::Player::new("0".to_string());
                                             p.x = update.x;
                                             p.y = update.y;
                                             p.z = update.z;
