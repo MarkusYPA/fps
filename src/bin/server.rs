@@ -14,12 +14,16 @@ fn main() -> std::io::Result<()> {
 
     let my_local_ip = local_ip().unwrap();
     let socket = UdpSocket::bind(format!("{}:{}", my_local_ip, PORT))?;
+    let map_display = match &parsed_flags.map {
+        flags::MapIdentifier::Id(id) => id.to_string(),
+        flags::MapIdentifier::Name(name) => name.clone(),
+    };
     println!(
         "Server started at {}:{} using map {}",
-        my_local_ip, PORT, parsed_flags.map_id
+        my_local_ip, PORT, map_display
     );
 
-    let mut game_state = GameState::new(Some(parsed_flags.map_id));
+    let mut game_state = GameState::new(Some(parsed_flags.map));
     let mut clients = HashMap::<SocketAddr, (u64, String, Instant)>::new();
     let mut client_inputs = HashMap::<u64, fps::Input>::new();
     let mut next_id: u64 = 0;
