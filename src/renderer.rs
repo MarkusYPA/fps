@@ -1,9 +1,14 @@
 use crate::textures::{self};
 use crate::{
-    Direction, GameState, HEIGHT, Sprite, WIDTH, spritesheet::SpriteSheet, textures::TextureManager,
+    Direction, GameState, Sprite,
+    consts::{
+        CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, FLOOR_COLOR, HEIGHT,
+        SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
+        WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
+    },
+    spritesheet::SpriteSheet,
+    textures::TextureManager,
 };
-
-const CAMERA_HEIGHT_OFFSET: f32 = 0.1;
 
 fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
     let angle_diff = ((player_angle - camera_angle).to_degrees() + 180.0).rem_euclid(360.0);
@@ -49,16 +54,16 @@ impl Renderer {
                 y: 4.3,
                 z: 0.0,
                 texture: "character2".to_string(),
-                width: 0.2,
-                height: 0.7,
+                width: SPRITE_NPC_WIDTH,
+                height: SPRITE_NPC_HEIGHT,
             },
             Sprite {
                 x: 4.2,
                 y: 4.3,
                 z: 0.0,
                 texture: "character3".to_string(),
-                width: 0.2,
-                height: 0.7,
+                width: SPRITE_NPC_WIDTH,
+                height: SPRITE_NPC_HEIGHT,
             },
         ];
         Renderer {
@@ -78,12 +83,12 @@ impl Renderer {
             // Clear the buffer with ceiling and floor colors
             for y in 0..horizon {
                 for x in 0..WIDTH {
-                    self.buffer[y * WIDTH + x] = 0x00AACCFF; // Ceiling
+                    self.buffer[y * WIDTH + x] = CEILING_COLOR;
                 }
             }
             for y in horizon..HEIGHT {
                 for x in 0..WIDTH {
-                    self.buffer[y * WIDTH + x] = 0x00555555; // Floor
+                    self.buffer[y * WIDTH + x] = FLOOR_COLOR;
                 }
             }
 
@@ -91,8 +96,10 @@ impl Renderer {
             for x in 0..WIDTH {
                 // ray direction
                 let camera_x = 2.0 * x as f32 / WIDTH as f32 - 1.0;
-                let ray_dir_x = player.angle.cos() + 0.66 * camera_x * (-player.angle.sin());
-                let ray_dir_y = player.angle.sin() + 0.66 * camera_x * player.angle.cos();
+                let ray_dir_x =
+                    player.angle.cos() + CAMERA_PLANE_SCALE * camera_x * (-player.angle.sin());
+                let ray_dir_y =
+                    player.angle.sin() + CAMERA_PLANE_SCALE * camera_x * player.angle.cos();
 
                 // direction and steps to measure if wall was hit
                 let mut map_x = player.x as usize;
@@ -158,9 +165,9 @@ impl Renderer {
                     .clamp(0, HEIGHT as isize) as usize;
 
                 let wall_color = if wall_type == 1 {
-                    0x008A7755
+                    WALL_COLOR_PRIMARY
                 } else {
-                    0x00695A41
+                    WALL_COLOR_SECONDARY
                 };
 
                 // save vertical wall line to buffer
@@ -207,8 +214,8 @@ impl Renderer {
                         y: other_player.y,
                         z: other_player.z,
                         texture: &other_player.texture,
-                        width: 0.5,
-                        height: 0.7,
+                        width: SPRITE_OTHER_PLAYER_WIDTH,
+                        height: SPRITE_OTHER_PLAYER_HEIGHT,
                         dist_sq: sprite_x * sprite_x + sprite_y * sprite_y,
                         frame: Some(frame),
                     });
@@ -230,8 +237,8 @@ impl Renderer {
                 let dir_x = player.angle.cos();
                 let dir_y = player.angle.sin();
 
-                let plane_x = -dir_y * 0.66;
-                let plane_y = dir_x * 0.66;
+                let plane_x = -dir_y * CAMERA_PLANE_SCALE;
+                let plane_y = dir_x * CAMERA_PLANE_SCALE;
 
                 let inv_det = 1.0 / (plane_x * dir_y - dir_x * plane_y);
                 let transform_x = inv_det * (dir_y * sprite_x - dir_x * sprite_y);
