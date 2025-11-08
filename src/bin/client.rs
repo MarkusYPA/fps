@@ -14,7 +14,7 @@ use winit_input_helper::WinitInputHelper;
 
 use fps::{
     ClientMessage, GameState, Input, ServerMessage,
-    consts::{HEIGHT, MOUSE_SPEED, PORT, WIDTH},
+    consts::{FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WIDTH},
     renderer::Renderer,
     textures::TextureManager,
 };
@@ -97,14 +97,16 @@ fn main() -> Result<()> {
     let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
 
     let socket_clone = socket.try_clone()?;
-    std::thread::spawn(move || loop {
-        let ping_message = ClientMessage::Ping;
-        let encoded = bincode::serialize(&ping_message).unwrap();
-        if let Err(e) = socket_clone.send(&encoded) {
-            eprintln!("Error sending ping: {}", e);
-            break;
+    std::thread::spawn(move || {
+        loop {
+            let ping_message = ClientMessage::Ping;
+            let encoded = bincode::serialize(&ping_message).unwrap();
+            if let Err(e) = socket_clone.send(&encoded) {
+                eprintln!("Error sending ping: {}", e);
+                break;
+            }
+            std::thread::sleep(Duration::from_secs(1));
         }
-        std::thread::sleep(Duration::from_secs(1));
     });
 
     let event_loop = EventLoop::new()?;
