@@ -1,8 +1,6 @@
-use crate::textures::Texture;
+use crate::{consts::CYAN_TRANSPARENT, textures::Texture};
 use image::error::{ParameterError, ParameterErrorKind};
-use image::{self, GenericImageView, Rgba};
-
-const CYAN_TRANSPARENT: Rgba<u8> = Rgba([0, 255, 255, 255]);
+use image::{self, GenericImageView};
 
 #[derive(Debug)]
 pub struct SpriteSheet {

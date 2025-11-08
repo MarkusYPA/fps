@@ -1,15 +1,29 @@
-use fps::{ClientMessage, GameState, PORT, Player, PlayerUpdate, ServerMessage, Welcome};
+use fps::{
+    ClientMessage, GameState, Player, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
+};
 use local_ip_address::local_ip;
-use std::collections::HashMap;
-use std::net::{SocketAddr, UdpSocket};
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    env,
+    net::{SocketAddr, UdpSocket},
+    time::{Duration, Instant},
+};
 
 fn main() -> std::io::Result<()> {
+    let parsed_flags = flags::parse_flags(env::args()).expect("Failed to parse flags");
+
     let my_local_ip = local_ip().unwrap();
     let socket = UdpSocket::bind(format!("{}:{}", my_local_ip, PORT))?;
-    println!("Server started at {}:{}", my_local_ip, PORT);
+    let map_display = match &parsed_flags.map {
+        flags::MapIdentifier::Id(id) => id.to_string(),
+        flags::MapIdentifier::Name(name) => name.clone(),
+    };
+    println!(
+        "Server started at {}:{} using map {}",
+        my_local_ip, PORT, map_display
+    );
 
-    let mut game_state = GameState::new();
+    let mut game_state = GameState::new(Some(parsed_flags.map));
     let mut clients = HashMap::<SocketAddr, (u64, String, Instant)>::new();
     let mut client_inputs = HashMap::<u64, fps::Input>::new();
     let mut next_id: u64 = 0;

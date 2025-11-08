@@ -34,11 +34,25 @@ The client will prompt you to enter the server's IP address. Copy the IP address
 
 The game window will open, and you can start playing. The client captures your keyboard input, sends it to the server, and the server sends back the updated game state to be rendered.
 
+## Select Map
+
+A set of map files in toml format is stored in the folder maps/. Choose one from 1 to 3 by using the flag '--map' or '-m' followed by a number. The game will default to map 1 if no choice is made.
+
+```bash
+cargo run --release --bin server -- --map 3
+```
+or
+```bash
+cargo run --release --bin server -- -m 3
+```
+
+
 ## Controls
 
 - **WASD Keys:** Move
 - **Mouse:** Turn
 - **Space:** Jump
+- **Shift:** Sprint
 - **Arrow Keys**: Simple movement
 - **Escape:** Exit the game
 - **Tab:** Unlock and lock cursor

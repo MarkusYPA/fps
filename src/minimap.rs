@@ -1,5 +1,11 @@
 use crate::renderer::Renderer;
-use crate::{GameState, HEIGHT, WIDTH};
+use crate::{
+    GameState, consts::HEIGHT, consts::MINIMAP_BACKGROUND_COLOR, consts::MINIMAP_BORDER_COLOR,
+    consts::MINIMAP_GRID_COLOR, consts::MINIMAP_HEIGHT, consts::MINIMAP_MARGIN,
+    consts::MINIMAP_OPEN_SPACE_COLOR, consts::MINIMAP_OTHER_PLAYER_COLOR,
+    consts::MINIMAP_PLAYER_DOT_RADIUS, consts::MINIMAP_PLAYER_ICON_SIZE,
+    consts::MINIMAP_WALL_COLOR, consts::MINIMAP_WIDTH, consts::WIDTH,
+};
 
 impl Renderer {
     // ===== Minimap Helper Functions =====
@@ -82,10 +88,10 @@ impl Renderer {
 
     /// Render the minimap in the top-right corner
     pub fn render_minimap(&mut self, game_state: &GameState, my_id: u64) {
-        let minimap_width = 150;
-        let minimap_height = 150;
-        let start_x = WIDTH - minimap_width - 10;
-        let start_y = 10;
+        let minimap_width = MINIMAP_WIDTH;
+        let minimap_height = MINIMAP_HEIGHT;
+        let start_x = WIDTH - minimap_width - MINIMAP_MARGIN;
+        let start_y = MINIMAP_MARGIN;
 
         // Get actual map dimensions
         let map_width = game_state.world.map.len();
@@ -99,7 +105,13 @@ impl Renderer {
         let tile_size = minimap_width / map_width.max(1);
 
         // Draw background (border and background fill)
-        self.fill_rect(start_x, start_y, minimap_width, minimap_height, 0x00111111); // Dark background
+        self.fill_rect(
+            start_x,
+            start_y,
+            minimap_width,
+            minimap_height,
+            MINIMAP_BACKGROUND_COLOR,
+        );
 
         // Draw world tiles
         for y in 0..map_height {
@@ -108,9 +120,9 @@ impl Renderer {
                 let py = start_y + y * tile_size;
                 let tile = game_state.world.get_tile(x, y);
                 let tile_color = if tile == 1 {
-                    0x00444444 // Wall: dark gray
+                    MINIMAP_WALL_COLOR
                 } else {
-                    0x00AAAAAA // Open space: light gray
+                    MINIMAP_OPEN_SPACE_COLOR
                 };
                 self.fill_rect(px, py, tile_size, tile_size, tile_color);
 
@@ -120,14 +132,14 @@ impl Renderer {
                     py as i32,
                     (px + tile_size) as i32,
                     py as i32,
-                    0x00222222,
+                    MINIMAP_GRID_COLOR,
                 );
                 self.draw_line(
                     px as i32,
                     py as i32,
                     px as i32,
                     (py + tile_size) as i32,
-                    0x00222222,
+                    MINIMAP_GRID_COLOR,
                 );
             }
         }
@@ -137,14 +149,19 @@ impl Renderer {
             if id != &my_id.to_string() {
                 let px = start_x + (player.x * tile_size as f32) as usize;
                 let py = start_y + (player.y * tile_size as f32) as usize;
-                self.draw_circle(px, py, 3, 0x00FF0000); // Red: other players
+                self.draw_circle(
+                    px,
+                    py,
+                    MINIMAP_PLAYER_DOT_RADIUS,
+                    MINIMAP_OTHER_PLAYER_COLOR,
+                );
             }
         }
 
         // Draw own player's indicator using a navigator PNG
         if let Some(player) = game_state.players.get(&my_id.to_string()) {
             if let Some(tex) = self.texture_manager.get_texture("navigator") {
-                let icon_size = 12.0;
+                let icon_size = MINIMAP_PLAYER_ICON_SIZE;
                 let (icon_w, icon_h) = (icon_size as i32, icon_size as i32);
                 let (half_w, half_h) = (icon_w / 2, icon_h / 2);
 
@@ -201,28 +218,28 @@ impl Renderer {
             start_y as i32,
             (start_x + minimap_width) as i32,
             start_y as i32,
-            0x00FFFFFF,
+            MINIMAP_BORDER_COLOR,
         );
         self.draw_line(
             (start_x + minimap_width) as i32,
             start_y as i32,
             (start_x + minimap_width) as i32,
             (start_y + minimap_height) as i32,
-            0x00FFFFFF,
+            MINIMAP_BORDER_COLOR,
         );
         self.draw_line(
             (start_x + minimap_width) as i32,
             (start_y + minimap_height) as i32,
             start_x as i32,
             (start_y + minimap_height) as i32,
-            0x00FFFFFF,
+            MINIMAP_BORDER_COLOR,
         );
         self.draw_line(
             start_x as i32,
             (start_y + minimap_height) as i32,
             start_x as i32,
             start_y as i32,
-            0x00FFFFFF,
+            MINIMAP_BORDER_COLOR,
         );
     }
 }

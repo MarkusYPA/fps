@@ -13,12 +13,11 @@ use winit::window::{CursorGrabMode, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
-    ClientMessage, GameState, HEIGHT, Input, PORT, ServerMessage, WIDTH, renderer::Renderer,
+    ClientMessage, GameState, Input, ServerMessage,
+    consts::{HEIGHT, MOUSE_SPEED, PORT, WIDTH},
+    renderer::Renderer,
     textures::TextureManager,
 };
-
-const MOUSE_SPEED: f32 = 0.06;
-const FRAME_TIME: f32 = 0.05;
 
 fn main() -> Result<()> {
     println!("Enter server IP address:");
@@ -251,6 +250,7 @@ fn main() -> Result<()> {
                 turn,
                 pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
                 jump: input.key_pressed(KeyCode::Space),
+                sprint: input.key_held(KeyCode::ShiftLeft),
             };
             mouse_dx = 0.0;
             mouse_dy = 0.0;
