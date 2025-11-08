@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use rand::Rng;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct World {
