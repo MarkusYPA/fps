@@ -2,6 +2,9 @@ use crate::{consts::CYAN_TRANSPARENT, textures::Texture};
 use image::error::{ParameterError, ParameterErrorKind};
 use image::{self, GenericImageView};
 
+use image::{DynamicImage, RgbaImage};
+use palette::{FromColor, Hsv, Srgb};
+
 #[derive(Debug)]
 pub struct SpriteSheet {
     pub idle: [Texture; 8],
@@ -85,5 +88,58 @@ impl SpriteSheet {
             });
         }
         Ok(frames)
+    }
+}
+
+fn shift_hue(img: &DynamicImage, degrees: f32) -> RgbaImage {
+    let mut out = RgbaImage::new(img.width(), img.height());
+
+    for (x, y, pixel) in img.pixels() {
+        let r = pixel[0] as f32 / 255.0;
+        let g = pixel[1] as f32 / 255.0;
+        let b = pixel[2] as f32 / 255.0;
+        let a = pixel[3];
+
+        // Convert pixel to linear RGB
+        let rgb = Srgb::new(r, g, b).into_linear();
+        let mut hsv = Hsv::from_color(rgb);
+
+        // Modify hue
+        hsv.hue += degrees;
+
+        // Convert back to *nonlinear* Srgb
+        let linear_rgb = palette::rgb::Rgb::from_color(hsv);
+        let new_rgb: Srgb<f32> = Srgb::from_linear(linear_rgb);
+        let to_u8 = |v: f32| (v.clamp(0.0, 1.0) * 255.0) as u8;
+
+        out.put_pixel(
+            x,
+            y,
+            image::Rgba([
+                to_u8(new_rgb.red),
+                to_u8(new_rgb.green),
+                to_u8(new_rgb.blue),
+                a,
+            ]),
+        );
+    }
+
+    out
+}
+
+pub fn hue_variations(path: &str) {
+    let base = image::open(path).expect("can't load base sheet");
+
+    for i in 1..10 {
+        let out = format!("assets/blob{i}.png");
+        if std::path::Path::new(&out).exists() {
+            println!("{} exists", out);
+            continue;
+        }
+
+        let degrees = 360.0 * (i as f32 / 10.0);
+        println!("giving it {} degrees", degrees);
+        let shifted = shift_hue(&base, degrees);
+        shifted.save(&out).unwrap();
     }
 }

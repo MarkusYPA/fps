@@ -17,6 +17,7 @@ use fps::{
     ClientMessage, GameState, Input, ServerMessage,
     consts::{FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WIDTH},
     renderer::Renderer,
+    spritesheet::hue_variations,
     textures::TextureManager,
 };
 
@@ -134,17 +135,29 @@ fn main() -> Result<()> {
         Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
     };
 
+    // generate hue variations of the spritesheet
+    hue_variations("assets/blob0.png");
+
+    println!("variations done");
+
     // define all necessary spritesheets
     let mut texture_manager = TextureManager::new();
     fps::textures::load_game_textures(&mut texture_manager)?;
+
+    println!("loaded textures");
+
     let mut spritesheets = HashMap::new();
     // key matches player's texture property
-    spritesheets.insert(
-        "teal".to_owned(),
-        fps::spritesheet::SpriteSheet::new("assets/blob1.png")?,
-    );
-
+    for i in 0..10 {
+        spritesheets.insert(
+            format!("{i}"),
+            fps::spritesheet::SpriteSheet::new(&format!("assets/blob{i}.png"))?,
+        );
+    }
     let mut renderer = Renderer::new(texture_manager, spritesheets);
+
+    println!("renderer sheets: {:?}", renderer.sprite_sheets.keys());
+
     let mut game_state: Option<GameState> = None;
 
     let mut frame_count = 0;
