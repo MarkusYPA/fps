@@ -57,7 +57,6 @@ impl TextureManager {
 }
 
 pub fn load_game_textures(texture_manager: &mut TextureManager) -> Result<(), image::ImageError> {
-    texture_manager.load_texture("character1".to_string(), "assets/character1.png")?;
     texture_manager.load_texture("character2".to_string(), "assets/character2.png")?;
     texture_manager.load_texture("character3".to_string(), "assets/character3.png")?;
     texture_manager.load_texture("character4".to_string(), "assets/character4.png")?;
