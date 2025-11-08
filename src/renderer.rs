@@ -33,10 +33,7 @@ pub struct Renderer {
     pub buffer: Vec<u32>,
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
-    //pub sprite_sheet: SpriteSheet,
-    //pub sprite_sheet_test: SpriteSheet,
     pub sprite_sheets: HashMap<String, SpriteSheet>,
-    //pub sprites: Vec<Sprite>,
 }
 
 struct SpriteInfo<'a> {
@@ -51,7 +48,6 @@ struct SpriteInfo<'a> {
 }
 
 impl Renderer {
-    //pub fn new(texture_manager: TextureManager, sprite_sheet: SpriteSheet, sprite_sheet_test: SpriteSheet) -> Self {
     pub fn new(
         texture_manager: TextureManager,
         sprite_sheets: HashMap<String, SpriteSheet>,
@@ -61,7 +57,6 @@ impl Renderer {
             z_buffer: vec![0.0; WIDTH],
             texture_manager,
             sprite_sheets,
-            //sprites,
         }
     }
 
