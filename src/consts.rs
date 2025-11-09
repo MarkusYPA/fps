@@ -38,3 +38,7 @@ pub const SPRITE_OTHER_PLAYER_HEIGHT: f32 = 0.7;
 pub const SPRITE_NPC_WIDTH: f32 = 0.2;
 pub const SPRITE_NPC_HEIGHT: f32 = 0.7;
 pub const CAMERA_PLANE_SCALE: f32 = 0.66;
+
+pub const GUN_SCALE: f32 = 1.0;
+pub const GUN_X_OFFSET: usize = 190;
+pub const GUN_Y_OFFSET: usize = 0;
