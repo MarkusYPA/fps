@@ -1,13 +1,15 @@
+use std::collections::HashMap;
+
 use crate::textures::{self};
 use crate::{
-    Direction, GameState, Sprite,
     consts::{
-        CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, FLOOR_COLOR, HEIGHT,
-        SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
-        WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
+        CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, FLOOR_COLOR, GUN_SCALE,
+        GUN_X_OFFSET, GUN_Y_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT,
+        SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
     },
     spritesheet::SpriteSheet,
     textures::TextureManager,
+    Direction, GameState,
 };
 
 fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
@@ -31,8 +33,7 @@ pub struct Renderer {
     pub buffer: Vec<u32>,
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
-    pub sprite_sheet: SpriteSheet,
-    pub sprites: Vec<Sprite>,
+    pub sprite_sheets: HashMap<String, SpriteSheet>,
 }
 
 struct SpriteInfo<'a> {
@@ -47,31 +48,41 @@ struct SpriteInfo<'a> {
 }
 
 impl Renderer {
-    pub fn new(texture_manager: TextureManager, sprite_sheet: SpriteSheet) -> Self {
-        let sprites = vec![
-            Sprite {
-                x: 3.2,
-                y: 4.3,
-                z: 0.0,
-                texture: "character2".to_string(),
-                width: SPRITE_NPC_WIDTH,
-                height: SPRITE_NPC_HEIGHT,
-            },
-            Sprite {
-                x: 4.2,
-                y: 4.3,
-                z: 0.0,
-                texture: "character3".to_string(),
-                width: SPRITE_NPC_WIDTH,
-                height: SPRITE_NPC_HEIGHT,
-            },
-        ];
+    pub fn new(
+        texture_manager: TextureManager,
+        sprite_sheets: HashMap<String, SpriteSheet>,
+    ) -> Self {
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT],
             z_buffer: vec![0.0; WIDTH],
             texture_manager,
-            sprite_sheet,
-            sprites,
+            sprite_sheets,
+        }
+    }
+
+    fn draw_sprite_2d(&mut self, texture: &textures::Texture, pos_x: usize, pos_y: usize, scale: f32) {
+        let scaled_width = (texture.width as f32 * scale) as usize;
+        let scaled_height = (texture.height as f32 * scale) as usize;
+
+        for y in 0..scaled_height {
+            for x in 0..scaled_width {
+                let screen_x = pos_x + x;
+                let screen_y = pos_y + y;
+
+                if screen_x < WIDTH && screen_y < HEIGHT {
+                    let tex_x = (x as f32 / scale) as u32;
+                    let tex_y = (y as f32 / scale) as u32;
+
+                    if tex_x < texture.width && tex_y < texture.height {
+                        let color = texture.pixels[(tex_y * texture.width + tex_x) as usize];
+                        let alpha = (color >> 24) & 0xFF;
+
+                        if alpha > 0 {
+                            self.buffer[screen_y * WIDTH + screen_x] = color;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -177,7 +188,7 @@ impl Renderer {
             }
 
             // sprites from world
-            let mut sprite_infos: Vec<SpriteInfo> = self
+            let mut sprite_infos: Vec<SpriteInfo> = game_state
                 .sprites
                 .iter()
                 .map(|s| {
@@ -201,9 +212,13 @@ impl Renderer {
                 if id != &my_id.to_string() {
                     let direction = get_direction(other_player.angle, player.angle);
                     let frame = match other_player.animation_state {
-                        crate::AnimationState::Idle => &self.sprite_sheet.idle[direction as usize],
+                        crate::AnimationState::Idle => {
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().idle
+                                [direction as usize]
+                        }
                         crate::AnimationState::Walking => {
-                            &self.sprite_sheet.walk[direction as usize][other_player.frame]
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().walk
+                                [direction as usize][other_player.frame]
                         }
                     };
 
@@ -318,6 +333,13 @@ impl Renderer {
 
         // Render minimap overlay
         self.render_minimap(game_state, my_id);
+
+        // Render gun
+        if let Some(gun_texture) = self.texture_manager.get_texture("gun").cloned() {
+            let gun_x = WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
+            let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize - GUN_Y_OFFSET;
+            self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+        }
     }
 
     pub fn draw_to_buffer(&self, frame: &mut [u8]) {

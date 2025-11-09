@@ -3,11 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use crate::consts::{
-    DEFAULT_PLAYER_MOVE_SPEED,
-    DEFAULT_PLAYER_ROT_SPEED,
-    PLAYER_JUMP_VELOCITY,
-    PLAYER_PITCH_LIMIT,
-    PLAYER_SPRINT_SPEED_MULTIPLIER,
+    DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, PLAYER_JUMP_VELOCITY, PLAYER_PITCH_LIMIT,
+    PLAYER_RADIUS, PLAYER_SPRINT_SPEED_MULTIPLIER, SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH,
 };
 
 pub mod consts;
@@ -98,7 +95,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new() -> Self {
+    pub fn new(texturename: String) -> Self {
         Player {
             x: 1.5,
             y: 1.5,
@@ -108,7 +105,7 @@ impl Player {
             velocity_z: 0.0,
             move_speed: DEFAULT_PLAYER_MOVE_SPEED,
             rot_speed: DEFAULT_PLAYER_ROT_SPEED,
-            texture: "character4".to_string(),
+            texture: texturename,
             animation_state: AnimationState::Idle,
             direction: Direction::Front,
             frame: 0,
@@ -160,15 +157,12 @@ impl Player {
         }
 
         self.angle += input.turn * self.rot_speed;
-        self.pitch = (self.pitch + input.pitch * self.rot_speed * 2.0).clamp(
-            -PLAYER_PITCH_LIMIT,
-            PLAYER_PITCH_LIMIT,
-        );
+        self.pitch = (self.pitch + input.pitch * self.rot_speed * 2.0)
+            .clamp(-PLAYER_PITCH_LIMIT, PLAYER_PITCH_LIMIT);
     }
 
     // Verbose but fast function that avoids heap allocation, vector creation and branching
     fn check_collision_and_move(&mut self, new_x: f32, new_y: f32, world: &World) {
-        let radius = 0.125;
         let dx = new_x - self.x;
         let dy = new_y - self.y;
 
@@ -178,9 +172,9 @@ impl Player {
         // --- Horizontal movement ---
         if dx < 0.0 {
             // Moving left: check left-side corners
-            let cx = new_x - radius;
-            let top_y = self.y + radius;
-            let bottom_y = self.y - radius;
+            let cx = new_x - PLAYER_RADIUS;
+            let top_y = self.y + PLAYER_RADIUS;
+            let bottom_y = self.y - PLAYER_RADIUS;
 
             if world.get_tile(cx.floor() as usize, top_y.floor() as usize) != 0
                 || world.get_tile(cx.floor() as usize, bottom_y.floor() as usize) != 0
@@ -189,9 +183,9 @@ impl Player {
             }
         } else if dx > 0.0 {
             // Moving right: check right-side corners
-            let cx = new_x + radius;
-            let top_y = self.y + radius;
-            let bottom_y = self.y - radius;
+            let cx = new_x + PLAYER_RADIUS;
+            let top_y = self.y + PLAYER_RADIUS;
+            let bottom_y = self.y - PLAYER_RADIUS;
 
             if world.get_tile(cx.floor() as usize, top_y.floor() as usize) != 0
                 || world.get_tile(cx.floor() as usize, bottom_y.floor() as usize) != 0
@@ -203,9 +197,9 @@ impl Player {
         // --- Vertical movement ---
         if dy < 0.0 {
             // Moving down: check bottom corners
-            let cy = new_y - radius;
-            let left_x = self.x - radius;
-            let right_x = self.x + radius;
+            let cy = new_y - PLAYER_RADIUS;
+            let left_x = self.x - PLAYER_RADIUS;
+            let right_x = self.x + PLAYER_RADIUS;
 
             if world.get_tile(left_x.floor() as usize, cy.floor() as usize) != 0
                 || world.get_tile(right_x.floor() as usize, cy.floor() as usize) != 0
@@ -214,9 +208,9 @@ impl Player {
             }
         } else if dy > 0.0 {
             // Moving up: check top corners
-            let cy = new_y + radius;
-            let left_x = self.x - radius;
-            let right_x = self.x + radius;
+            let cy = new_y + PLAYER_RADIUS;
+            let left_x = self.x - PLAYER_RADIUS;
+            let right_x = self.x + PLAYER_RADIUS;
 
             if world.get_tile(left_x.floor() as usize, cy.floor() as usize) != 0
                 || world.get_tile(right_x.floor() as usize, cy.floor() as usize) != 0
@@ -249,6 +243,7 @@ pub struct Sprite {
 pub struct GameState {
     pub players: HashMap<String, Player>,
     pub world: World,
+    pub sprites: Vec<Sprite>,
 }
 
 impl GameState {
@@ -258,9 +253,28 @@ impl GameState {
             Some(crate::flags::MapIdentifier::Name(name)) => World::new(Some(0), Some(&name)),
             None => World::new(Some(1), None),
         };
+        let sprites = vec![
+            Sprite {
+                x: 3.2,
+                y: 4.3,
+                z: 0.0,
+                texture: "character2".to_string(),
+                width: SPRITE_NPC_WIDTH,
+                height: SPRITE_NPC_HEIGHT,
+            },
+            Sprite {
+                x: 4.2,
+                y: 4.3,
+                z: 0.0,
+                texture: "character3".to_string(),
+                width: SPRITE_NPC_WIDTH,
+                height: SPRITE_NPC_HEIGHT,
+            },
+        ];
         GameState {
             players: HashMap::new(),
             world,
+            sprites,
         }
     }
 

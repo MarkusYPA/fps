@@ -2,6 +2,8 @@ use fps::{
     ClientMessage, GameState, Player, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
 };
 use local_ip_address::local_ip;
+use rand::prelude::*;
+use rand::rng;
 use std::{
     collections::HashMap,
     env,
@@ -28,6 +30,11 @@ fn main() -> std::io::Result<()> {
     let mut client_inputs = HashMap::<u64, fps::Input>::new();
     let mut next_id: u64 = 0;
 
+    // Create and shuffle numbers for assigning random sprites to players
+    let mut rng = rng();
+    let mut sprite_nums: Vec<u8> = (0..10).collect();
+    sprite_nums.shuffle(&mut rng);
+
     let mut buf = [0; 1024];
 
     let tick_rate = 100; // ticks per second
@@ -50,10 +57,9 @@ fn main() -> std::io::Result<()> {
                     match client_message {
                         ClientMessage::Connect(username) => {
                             if !clients.contains_key(&src) {
-                                if clients
-                                    .values()
-                                    .any(|(_, name, _)| name.to_lowercase() == username.to_lowercase())
-                                {
+                                if clients.values().any(|(_, name, _)| {
+                                    name.to_lowercase() == username.to_lowercase()
+                                }) {
                                     println!(
                                         "Rejected connection from {} — username '{}' is already in use.",
                                         src, username
@@ -80,7 +86,8 @@ fn main() -> std::io::Result<()> {
                                         "New client connected: {} (username: {})",
                                         src, username
                                     );
-                                    clients.insert(src, (next_id, username.clone(), Instant::now()));
+                                    clients
+                                        .insert(src, (next_id, username.clone(), Instant::now()));
 
                                     let welcome = Welcome { id: next_id };
                                     let encoded_welcome =
@@ -90,7 +97,7 @@ fn main() -> std::io::Result<()> {
 
                                     game_state
                                         .players
-                                        .insert(next_id.to_string(), Player::new());
+                                        .insert(next_id.to_string(), Player::new(sprite_nums[(next_id%10) as usize].to_string()));
                                     client_inputs.insert(next_id, fps::Input::default()); // Initialize with default input
                                     next_id += 1;
 
@@ -114,6 +121,13 @@ fn main() -> std::io::Result<()> {
                 }
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     break; // No more messages to read
+                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionReset => {
+                    // On Windows, we get "connection reset" errors on UDP sockets
+                    // when a client sends an ICMP port unreachable message.
+                    // We can safely ignore these and have a clean terminal.
+                    // Later client will be safely timed out.
+                    continue;
                 }
                 Err(e) => {
                     eprintln!("Couldn't receive a datagram: {}", e);

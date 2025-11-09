@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::collections::HashMap;
 use std::io::{self, Write};
 use std::net::UdpSocket;
 use std::sync::Arc;
@@ -14,8 +15,9 @@ use winit_input_helper::WinitInputHelper;
 
 use fps::{
     ClientMessage, GameState, Input, ServerMessage,
-    consts::{HEIGHT, MOUSE_SPEED, PORT, WIDTH},
+    consts::{FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WIDTH},
     renderer::Renderer,
+    spritesheet::hue_variations,
     textures::TextureManager,
 };
 
@@ -97,14 +99,16 @@ fn main() -> Result<()> {
     let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
 
     let socket_clone = socket.try_clone()?;
-    std::thread::spawn(move || loop {
-        let ping_message = ClientMessage::Ping;
-        let encoded = bincode::serialize(&ping_message).unwrap();
-        if let Err(e) = socket_clone.send(&encoded) {
-            eprintln!("Error sending ping: {}", e);
-            break;
+    std::thread::spawn(move || {
+        loop {
+            let ping_message = ClientMessage::Ping;
+            let encoded = bincode::serialize(&ping_message).unwrap();
+            if let Err(e) = socket_clone.send(&encoded) {
+                eprintln!("Error sending ping: {}", e);
+                break;
+            }
+            std::thread::sleep(Duration::from_secs(1));
         }
-        std::thread::sleep(Duration::from_secs(1));
     });
 
     let event_loop = EventLoop::new()?;
@@ -131,11 +135,20 @@ fn main() -> Result<()> {
         Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
     };
 
+    // generate hue variations of the spritesheet, if they don't already exist
+    hue_variations("assets/blob0.png");
+
+    // define spritesheets
     let mut texture_manager = TextureManager::new();
     fps::textures::load_game_textures(&mut texture_manager)?;
-    let sprite_sheet = fps::spritesheet::SpriteSheet::new("assets/rott-ianpaulfreeley.png")?;
-
-    let mut renderer = Renderer::new(texture_manager, sprite_sheet);
+    let mut spritesheets = HashMap::new();    
+    for i in 0..10 {
+        spritesheets.insert(
+            format!("{i}"), // key matches a player's texture property
+            fps::spritesheet::SpriteSheet::new(&format!("assets/blob{i}.png"))?,
+        );
+    }
+    let mut renderer = Renderer::new(texture_manager, spritesheets);
     let mut game_state: Option<GameState> = None;
 
     let mut frame_count = 0;
@@ -155,7 +168,7 @@ fn main() -> Result<()> {
             for player in gs.players.values_mut() {
                 if player.animation_state == fps::AnimationState::Walking {
                     player.frame_timer += delta_time;
-                    if player.frame_timer > 0.150 {
+                    if player.frame_timer > FRAME_TIME {
                         player.frame_timer = 0.0;
                         player.frame = (player.frame + 1) % 4;
                     }
@@ -291,7 +304,7 @@ fn main() -> Result<()> {
                                             player.animation_state = update.animation_state;
                                         } else {
                                             // New player joined — insert into local game state
-                                            let mut p = fps::Player::new();
+                                            let mut p = fps::Player::new("0".to_string());
                                             p.x = update.x;
                                             p.y = update.y;
                                             p.z = update.z;
