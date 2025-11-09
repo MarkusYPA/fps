@@ -25,7 +25,7 @@ Server started at 192.168.1.10:8080
 In your second terminal, run this command to start the client:
 
 ```bash
-cargo run --release --bin client
+cargo run --release
 ```
 
 The client will prompt you to enter the server's IP address. Copy the IP address from the server's console output and paste it into the client prompt, then press Enter.
