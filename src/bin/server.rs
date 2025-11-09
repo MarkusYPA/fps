@@ -122,6 +122,13 @@ fn main() -> std::io::Result<()> {
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     break; // No more messages to read
                 }
+                Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionReset => {
+                    // On Windows, we get "connection reset" errors on UDP sockets
+                    // when a client sends an ICMP port unreachable message.
+                    // We can safely ignore these and have a clean terminal.
+                    // Later client will be safely timed out.
+                    continue;
+                }
                 Err(e) => {
                     eprintln!("Couldn't receive a datagram: {}", e);
                     // Consider what to do with this error, e.g., continue or break
