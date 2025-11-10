@@ -153,7 +153,7 @@ impl Renderer {
                         wall_type = 1;
                     }
 
-                    if game_state.world.get_tile(map_x, map_y) == 1 {
+                    if game_state.world.get_tile(map_x, map_y) > 0 {
                         hit = true;
                     }
                 }
@@ -175,15 +175,66 @@ impl Renderer {
                 let draw_end = (line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
                     .clamp(0, HEIGHT as isize) as usize;
 
-                let wall_color = if wall_type == 1 {
-                    WALL_COLOR_PRIMARY
-                } else {
-                    WALL_COLOR_SECONDARY
-                };
+                let wall_tile = game_state.world.get_tile(map_x, map_y);
+                let wall_texture_name = format!("wall{}", wall_tile);
 
-                // save vertical wall line to buffer
-                for y in draw_start..draw_end {
-                    self.buffer[y * WIDTH + x] = wall_color;
+                if let Some(texture) = self.texture_manager.get_texture(&wall_texture_name) {
+                    // calculate where the wall was hit
+                    let wall_x = if wall_type == 0 {
+                        player.y + perp_wall_dist * ray_dir_y
+                    } else {
+                        player.x + perp_wall_dist * ray_dir_x
+                    };
+                    let wall_x = wall_x - wall_x.floor();
+
+                    // x coordinate on the texture
+                    let mut tex_x = (wall_x * texture.width as f32) as u32;
+                    if (wall_type == 0 && ray_dir_x > 0.0)
+                        || (wall_type == 1 && ray_dir_y < 0.0)
+                    {
+                        tex_x = texture.width - tex_x - 1;
+                    }
+
+                    // save vertical wall line to buffer
+                    for y in draw_start..draw_end {
+                        let tex_y_num = (y as isize - HEIGHT as isize / 2 - pitch_offset
+                            - z_offset + line_height / 2)
+                            * texture.height as isize;
+                        if line_height == 0 {
+                            continue;
+                        }
+                        let tex_y = (tex_y_num / line_height)
+                            .max(0)
+                            .min(texture.height as isize - 1)
+                            as u32;
+
+                        let color_index = (tex_y * texture.width + tex_x) as usize;
+                        if color_index < texture.pixels.len() {
+                            let color = texture.pixels[color_index];
+
+                            // Make one side of wall darker
+                            let final_color = if wall_type == 1 {
+                                color
+                            } else {
+                                let r = (color >> 16) & 0xFF;
+                                let g = (color >> 8) & 0xFF;
+                                let b = color & 0xFF;
+                                let a = (color >> 24) & 0xFF;
+                                (a << 24) | ((r / 2) << 16) | ((g / 2) << 8) | (b / 2)
+                            };
+                            self.buffer[y * WIDTH + x] = final_color;
+                        }
+                    }
+                } else {
+                    // Fallback to solid color if texture not found
+                    let wall_color = if wall_type == 1 {
+                        WALL_COLOR_PRIMARY
+                    } else {
+                        WALL_COLOR_SECONDARY
+                    };
+                    for y in draw_start..draw_end {
+                        self.buffer[y * WIDTH + x] = wall_color;
+                    }
                 }
             }
 
