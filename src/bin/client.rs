@@ -1,7 +1,8 @@
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{self, Write};
-use std::net::UdpSocket;
+use std::net::{SocketAddr, UdpSocket};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -21,82 +22,161 @@ use fps::{
     textures::TextureManager,
 };
 
-fn main() -> Result<()> {
-    println!("Enter server IP address:");
-    let mut server_ip = String::new();
-    io::stdin().read_line(&mut server_ip)?;
-    let ip_only = server_ip.trim().rsplitn(2, ':').last().unwrap().trim();
-    let server_address = format!("{}:{}", ip_only, PORT);
+#[derive(Serialize, Deserialize, Default, Debug)]
+struct Config {
+    last_name: Option<String>,
+    recent_servers: Vec<String>,
+}
 
-    let socket = UdpSocket::bind("0.0.0.0:0")?;
-    socket.connect(&server_address)?;
-    socket.set_nonblocking(true)?;
+fn connect_to_server() -> Result<Option<(UdpSocket, u64, String)>> {
+    let config_path = "client_config.toml";
+    let mut config: Config = std::fs::read_to_string(config_path)
+        .ok()
+        .and_then(|content| toml::from_str(&content).ok())
+        .unwrap_or_default();
 
-    let mut buf = [0; 2048];
-    let mut my_id: Option<u64> = None;
-
-    // Outer loop: continue until successfully connected
     loop {
-        print!("Enter a username: ");
-        io::stdout().flush()?; // ensure prompt is printed
-        let mut username = String::new();
-        io::stdin().read_line(&mut username)?;
-        let username = username.trim().to_string();
-
-        // Send connect message
-        let connect_message = ClientMessage::Connect(username.clone());
-        let encoded = bincode::serialize(&connect_message)?;
-        socket.send(&encoded)?;
-
-        // Wait for a response with timeout
-        let start = Instant::now();
-        let timeout = Duration::from_secs(2);
-        let mut got_response = false;
-
-        while start.elapsed() < timeout {
-            match socket.recv_from(&mut buf) {
-                Ok((amt, _)) => {
-                    if let Ok(server_message) = bincode::deserialize::<ServerMessage>(&buf[..amt]) {
-                        match server_message {
-                            ServerMessage::Welcome(welcome) => {
-                                println!("Connected to server with id: {}", welcome.id);
-                                my_id = Some(welcome.id);
-                                got_response = true;
-                                break;
-                            }
-                            ServerMessage::UsernameRejected(reason) => {
-                                eprintln!("Connection rejected: {}", reason);
-                                // prompt for a new username
-                                got_response = true;
-                                break;
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    std::thread::sleep(Duration::from_millis(10));
-                }
-                Err(e) => {
-                    eprintln!("Error receiving message: {}", e);
-                    return Err(e.into());
-                }
-            }
+        // Get server IP
+        println!("Select a server or enter a new IP:");
+        for (i, server) in config.recent_servers.iter().enumerate() {
+            println!("{}: {}", i + 1, server);
         }
+        print!(
+            "Enter selection (1-{}, default: 1), or new IP: ",
+            config.recent_servers.len()
+        );
+        io::stdout().flush()?;
 
-        if got_response {
-            // If we connected successfully, exit loop
-            if let Ok(ServerMessage::Welcome(_)) = bincode::deserialize::<ServerMessage>(&buf[..]) {
-                break;
+        let mut selection = String::new();
+        io::stdin().read_line(&mut selection)?;
+        let selection = selection.trim();
+
+        let server_address_str = if selection.is_empty() {
+            if let Some(first) = config.recent_servers.get(0) {
+                first.clone()
             } else {
-                continue; // username rejected, ask again
+                println!("No recent servers, please enter an IP:");
+                let mut server_ip = String::new();
+                io::stdin().read_line(&mut server_ip)?;
+                server_ip.trim().to_string()
+            }
+        } else if let Ok(num) = selection.parse::<usize>() {
+            if num > 0 && num <= config.recent_servers.len() {
+                config.recent_servers.get(num - 1).cloned().unwrap()
+            } else {
+                println!("Invalid selection. Please enter a new IP:");
+                let mut server_ip = String::new();
+                io::stdin().read_line(&mut server_ip)?;
+                server_ip.trim().to_string()
             }
         } else {
-            eprintln!("No response from server, retrying...");
+            selection.to_string()
+        };
+
+        let server_address: SocketAddr = if server_address_str.contains(':') {
+            server_address_str.parse()?
+        } else {
+            format!("{}:{}", server_address_str, PORT).parse()?
+        };
+
+        let socket = UdpSocket::bind("0.0.0.0:0")?;
+        socket.connect(server_address)?;
+        socket.set_nonblocking(true)?;
+
+        let mut buf = [0; 2048];
+
+        // Inner loop for username attempts
+        loop {
+            print!(
+                "Enter a username (default: {}): ",
+                config.last_name.as_deref().unwrap_or("")
+            );
+            io::stdout().flush()?;
+            let mut username_input = String::new();
+            io::stdin().read_line(&mut username_input)?;
+            let username_trimmed = username_input.trim();
+
+            let final_username = if username_trimmed.is_empty() {
+                config.last_name.clone().unwrap_or_default()
+            } else {
+                username_trimmed.to_string()
+            };
+
+            if final_username.is_empty() {
+                println!("Username cannot be empty.");
+                continue;
+            }
+            
+        // Send connect message
+            let connect_message = ClientMessage::Connect(final_username.clone());
+            let encoded = bincode::serialize(&connect_message)?;
+            socket.send(&encoded)?;
+
+        // Wait for a response with timeout
+            let start = Instant::now();
+            let timeout = Duration::from_secs(2);
+            let mut got_response = false;
+
+            while start.elapsed() < timeout {
+                match socket.recv_from(&mut buf) {
+                    Ok((amt, _)) => {
+                        if let Ok(server_message) = bincode::deserialize::<ServerMessage>(&buf[..amt]) {
+                            match server_message {
+                                ServerMessage::Welcome(welcome) => {
+                                    println!("Connected to server with id: {}", welcome.id);
+
+                                    // Update and save config
+                                    config.last_name = Some(final_username.clone());
+                                    let addr_string = server_address.to_string();
+                                    config.recent_servers.retain(|s| s != &addr_string);
+                                    config.recent_servers.insert(0, addr_string);
+                                    config.recent_servers.truncate(5);
+                                    let config_str = toml::to_string_pretty(&config)?;
+                                    std::fs::write(config_path, config_str)?;
+
+                                    return Ok(Some((socket, welcome.id, final_username)));
+                                }
+                                ServerMessage::UsernameRejected(reason) => {
+                                    eprintln!("Connection rejected: {}", reason);
+                                    // prompt for a new username
+                                    got_response = true;
+                                    break;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(e) => return Err(e.into()),
+                }
+            }
+
+            if got_response {
+                // Username was rejected, loop again for a new username
+                continue;
+            } else {
+                eprintln!("No response from server. Check the IP and server status.");
+                break; // Breaks inner loop to re-prompt for IP
+            }
+        }
+
+        print!("Try again with a different IP? (y/n): ");
+        io::stdout().flush()?;
+        let mut choice = String::new();
+        io::stdin().read_line(&mut choice)?;
+        if choice.trim().to_lowercase() != "y" {
+            return Ok(None); // Exit if user doesn't want to retry
         }
     }
+}
 
-    let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
+fn main() -> Result<()> {
+    let (socket, my_id, _username) = match connect_to_server()? {
+        Some(conn) => conn,
+        None => return Ok(()), // User chose to exit
+    };
 
     let socket_clone = socket.try_clone()?;
     std::thread::spawn(move || {
@@ -141,7 +221,7 @@ fn main() -> Result<()> {
     // define spritesheets
     let mut texture_manager = TextureManager::new();
     fps::textures::load_game_textures(&mut texture_manager)?;
-    let mut spritesheets = HashMap::new();    
+    let mut spritesheets = HashMap::new();
     for i in 0..10 {
         spritesheets.insert(
             format!("{i}"), // key matches a player's texture property
