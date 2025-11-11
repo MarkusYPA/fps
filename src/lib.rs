@@ -19,6 +19,7 @@ pub enum ClientMessage {
     Connect(String),
     Input(Input),
     Ping,
+    Shot { angle: f32, pitch: f32 },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -28,6 +29,15 @@ pub enum ServerMessage {
     InitialState(GameState),
     UsernameRejected(String),
     PlayerLeft(u64),
+    ShotHit(Hit),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Hit {
+    pub shooter_id: u64,
+    pub shooter_name: String,
+    pub target_id: u64,
+    pub target_name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

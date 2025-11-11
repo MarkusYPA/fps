@@ -257,6 +257,21 @@ fn main() -> Result<()> {
                 turn += 1.0;
             }
 
+            if input.mouse_pressed(MouseButton::Left) {
+                if let Some(gs) = &game_state {
+                    if let Some(p) = gs.players.get(&my_id.to_string()) {
+                        let shot_message = ClientMessage::Shot {
+                            angle: p.angle,
+                            pitch: p.pitch,
+                        };
+                        let encoded_shot = bincode::serialize(&shot_message).unwrap();
+                        if let Err(e) = socket.send(&encoded_shot) {
+                            eprintln!("Error sending shot data: {}", e);
+                        }
+                    }
+                }
+            }
+
             let client_input = Input {
                 forth: input.key_held(KeyCode::ArrowUp) || input.key_held(KeyCode::KeyW),
                 back: input.key_held(KeyCode::ArrowDown) || input.key_held(KeyCode::KeyS),
@@ -327,6 +342,13 @@ fn main() -> Result<()> {
                             ServerMessage::PlayerLeft(id) => {
                                 if let Some(ref mut gs) = game_state {
                                     gs.players.remove(&id.to_string());
+                                }
+                            }
+                            ServerMessage::ShotHit(hit) => {
+                                if hit.shooter_id == my_id {
+                                    println!("I shot {}", hit.target_name);
+                                } else if hit.target_id == my_id {
+                                    println!("{} shot me", hit.shooter_name);
                                 }
                             }
                             _ => {}
