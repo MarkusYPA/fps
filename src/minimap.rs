@@ -119,7 +119,7 @@ impl Renderer {
                 let px = start_x + x * tile_size;
                 let py = start_y + y * tile_size;
                 let tile = game_state.world.get_tile(x, y);
-                let tile_color = if tile == 1 {
+                let tile_color = if tile > 0 {
                     MINIMAP_WALL_COLOR
                 } else {
                     MINIMAP_OPEN_SPACE_COLOR
