@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use pixels::{Pixels, SurfaceTexture};
 use winit::dpi::{PhysicalPosition, LogicalSize};
-use winit::event::{DeviceEvent, Event, WindowEvent};
+use winit::event::{DeviceEvent, Event, WindowEvent, MouseButton};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
 use winit::window::{CursorGrabMode, WindowBuilder};
@@ -274,6 +274,7 @@ fn main() -> Result<()> {
                 pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
                 jump: input.key_pressed(KeyCode::Space),
                 sprint: input.key_held(KeyCode::ShiftLeft),
+                shoot: input.mouse_pressed(MouseButton::Left),
             };
             mouse_dx = 0.0;
             mouse_dy = 0.0;
@@ -313,6 +314,7 @@ fn main() -> Result<()> {
                                             player.pitch = update.pitch;
                                             player.texture = update.texture;
                                             player.animation_state = update.animation_state;
+                                            player.shooting = update.shooting;
                                         } else {
                                             // New player joined — insert into local game state
                                             let mut p = Player::new("0".to_string());
@@ -323,6 +325,7 @@ fn main() -> Result<()> {
                                             p.pitch = update.pitch;
                                             p.texture = update.texture;
                                             p.animation_state = update.animation_state;
+                                            p.shooting = update.shooting;
                                             p.direction = fps::Direction::Front;
                                             gs.players.insert(id.clone(), p);
                                         }

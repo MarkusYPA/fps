@@ -39,6 +39,7 @@ pub struct Welcome {
 pub enum AnimationState {
     Idle,
     Walking,
+    Shooting,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -62,6 +63,7 @@ pub struct PlayerUpdate {
     pub pitch: f32,
     pub texture: String,
     pub animation_state: AnimationState,
+    pub shooting: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -74,6 +76,7 @@ pub struct Input {
     pub pitch: f32,
     pub jump: bool,
     pub sprint: bool,
+    pub shoot: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -128,7 +131,15 @@ impl GameState {
     pub fn update(&mut self, id: String, input: &Input) {
         if let Some(player) = self.players.get_mut(&id) {
             player.take_input(input, &self.world);
-            if input.forth || input.back || input.left || input.right {
+
+            if player.shooting {
+                player.animation_state = AnimationState::Shooting;
+                if player.shoot_timer > 0.0 {
+                    player.shoot_timer -= 0.1;
+                } else {
+                    player.shooting = false;
+                }
+            } else if input.forth || input.back || input.left || input.right {
                 player.animation_state = AnimationState::Walking;
             } else {
                 player.animation_state = AnimationState::Idle;

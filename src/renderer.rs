@@ -276,6 +276,10 @@ impl Renderer {
                             &self.sprite_sheets.get(&other_player.texture).unwrap().walk
                                 [direction as usize][other_player.frame]
                         }
+                        crate::AnimationState::Shooting => {
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().shoot
+                                [direction as usize]
+                        }
                     };
 
                     let sprite_x = other_player.x - player.x;
@@ -391,10 +395,13 @@ impl Renderer {
         self.render_minimap(game_state, my_id);
 
         // Render gun
-        if let Some(gun_texture) = self.texture_manager.get_texture("gun").cloned() {
-            let gun_x = WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
-            let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize;
-            self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+        if let Some(player) = game_state.players.get(&my_id.to_string()) {
+            let gun_texture_name = if player.shooting { "gunshot" } else { "gun" };
+            if let Some(gun_texture) = self.texture_manager.get_texture(gun_texture_name).cloned() {
+                let gun_x = WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
+                let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize;
+                self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+            }
         }
 
         // Render crosshair

@@ -25,6 +25,8 @@ pub struct Player {
     pub direction: Direction,
     pub frame: usize,
     pub frame_timer: f32,
+    pub shooting: bool,
+    pub shoot_timer: f32,
 }
 
 impl Player {
@@ -43,6 +45,8 @@ impl Player {
             direction: Direction::Front,
             frame: 0,
             frame_timer: 0.0,
+            shooting: false,
+            shoot_timer: 0.0,
         }
     }
 
@@ -92,6 +96,11 @@ impl Player {
         self.angle += input.turn * self.rot_speed;
         self.pitch = (self.pitch + input.pitch * self.rot_speed * 2.0)
             .clamp(-PLAYER_PITCH_LIMIT, PLAYER_PITCH_LIMIT);
+
+        if input.shoot {
+            self.shooting = true;
+            self.shoot_timer = 0.2;
+        }
     }
 
     // Verbose but fast function that avoids heap allocation, vector creation and branching
