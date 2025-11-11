@@ -1,7 +1,6 @@
 use fps::{
     ClientMessage, GameState, PlayerUpdate, ServerMessage, Welcome,
     consts::PORT,
-    consts::{CAMERA_HEIGHT_OFFSET, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH},
     flags,
     player::Player,
 };
@@ -124,98 +123,30 @@ fn main() -> std::io::Result<()> {
                         ClientMessage::Ping => {
                             // Ping received, client is alive
                         }
-                        ClientMessage::Shot { angle, pitch } => {
-                            if let Some((shooter_id, _, _)) = clients.get(&src) {
-                                if let Some(shooter) =
-                                    game_state.players.get(&shooter_id.to_string())
-                                {
-                                    let shot_dir_x = angle.cos();
-                                    let shot_dir_y = angle.sin();
+                        ClientMessage::Shot => {
+                            if let Some((shooter_id, shooter_name, _)) = clients.get(&src) {
+                                if let Some(target_id) = game_state.measure_shot(shooter_id) {
 
-                                    for (target_id_str, target) in &game_state.players {
-                                        if &shooter_id.to_string() != target_id_str {
-                                            let dx = target.x - shooter.x;
-                                            let dy = target.y - shooter.y;
-                                            let dist_sq = dx * dx + dy * dy;
+                                    let target_name = clients
+                                        .values()
+                                        .find(|(id, _, _)| *id == target_id)
+                                        .unwrap()
+                                        .1
+                                        .clone();
 
-                                            if dist_sq < 100.0 {
-                                                // Max shot distance
+                                    println!("{} shot {}", shooter_name, target_name);
 
-                                                // Calculate the dot product of the vector from shooter to target and the shot direction.
-                                                // A positive dot product means the target is generally in front of the shooter.
-                                                let dot = dx * shot_dir_x + dy * shot_dir_y;
-                                                if dot > 0.0 {
-                                                    // Calculate the squared length of the projection of the shooter-to-target vector onto the shot direction vector.
-                                                    // This helps determine how far along the shot's path the target is.
-                                                    let proj_len_sq = dot * dot
-                                                        / (shot_dir_x * shot_dir_x
-                                                            + shot_dir_y * shot_dir_y);
-
-                                                    // Squared perpendicular distance from the target to the shot ray: how far off-axis the target is from the shot's line of fire.
-                                                    let perp_dist_sq = dist_sq - proj_len_sq;
-
-                                                    let target_width =
-                                                        SPRITE_OTHER_PLAYER_WIDTH * 0.5; // Player hitbox width
-                                                    if perp_dist_sq < target_width * target_width {
-                                                        // Vertical check
-                                                        let dist = dist_sq.sqrt();
-                                                        let shot_height_at_target = shooter.z
-                                                            + CAMERA_HEIGHT_OFFSET
-                                                            + pitch * dist * 0.5; // pitch is a vertical offset, not an angle 
-
-                                                        if shot_height_at_target > target.z - 0.5
-                                                            && shot_height_at_target
-                                                                < target.z
-                                                                    + SPRITE_OTHER_PLAYER_HEIGHT
-                                                                    - 0.5
-                                                        {
-                                                            // Shot hit someone
-                                                            let target_id = target_id_str
-                                                                .parse::<u64>()
-                                                                .unwrap();
-                                                            let shooter_name = clients
-                                                                .get(&src)
-                                                                .unwrap()
-                                                                .1
-                                                                .clone();
-                                                            let target_name = clients
-                                                                .values()
-                                                                .find(|(id, _, _)| *id == target_id)
-                                                                .unwrap()
-                                                                .1
-                                                                .clone();
-
-                                                            println!(
-                                                                "{} shot {}",
-                                                                shooter_name, target_name
-                                                            );
-
-                                                            let hit = fps::Hit {
-                                                                shooter_id: *shooter_id,
-                                                                shooter_name,
-                                                                target_id,
-                                                                target_name,
-                                                            };
-                                                            let shot_hit_message =
-                                                                ServerMessage::ShotHit(hit);
-                                                            let encoded_message =
-                                                                bincode::serialize(
-                                                                    &shot_hit_message,
-                                                                )
-                                                                .unwrap();
-                                                            for client_addr in clients.keys() {
-                                                                socket
-                                                                    .send_to(
-                                                                        &encoded_message,
-                                                                        client_addr,
-                                                                    )
-                                                                    .unwrap();
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                                    let hit = fps::Hit {
+                                        shooter_id: *shooter_id,
+                                        shooter_name: shooter_name.to_string(),
+                                        target_id,
+                                        target_name,
+                                    };
+                                    let shot_hit_message = ServerMessage::ShotHit(hit);
+                                    let encoded_message =
+                                        bincode::serialize(&shot_hit_message).unwrap();
+                                    for client_addr in clients.keys() {
+                                        socket.send_to(&encoded_message, client_addr).unwrap();
                                     }
                                 }
                             }

@@ -28,7 +28,6 @@ pub struct Player {
     pub frame: usize,
     pub frame_timer: f32,
     pub shooting: bool,
-    //pub shoot_timer: f32,
     pub shoot_timer: Duration,
 }
 

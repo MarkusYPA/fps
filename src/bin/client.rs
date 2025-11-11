@@ -258,17 +258,10 @@ fn main() -> Result<()> {
             }
 
             if input.mouse_pressed(MouseButton::Left) {
-                if let Some(gs) = &game_state {
-                    if let Some(p) = gs.players.get(&my_id.to_string()) {
-                        let shot_message = ClientMessage::Shot {
-                            angle: p.angle,
-                            pitch: p.pitch,
-                        };
-                        let encoded_shot = bincode::serialize(&shot_message).unwrap();
-                        if let Err(e) = socket.send(&encoded_shot) {
-                            eprintln!("Error sending shot data: {}", e);
-                        }
-                    }
+                let shot_message = ClientMessage::Shot;
+                let encoded_shot = bincode::serialize(&shot_message).unwrap();
+                if let Err(e) = socket.send(&encoded_shot) {
+                    eprintln!("Error sending shot data: {}", e);
                 }
             }
 

@@ -1,9 +1,12 @@
 use crate::map::World;
 use crate::player::Player;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, f32::MAX, time::Duration};
 
-use crate::consts::{SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH};
+use crate::consts::{
+    CAMERA_HEIGHT_OFFSET, SHOT_MAX_DISTANCE, SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH,
+    SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
+};
 
 pub mod consts;
 pub mod flags;
@@ -19,7 +22,7 @@ pub enum ClientMessage {
     Connect(String),
     Input(Input),
     Ping,
-    Shot { angle: f32, pitch: f32 },
+    Shot,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -154,5 +157,69 @@ impl GameState {
                 player.animation_state = AnimationState::Idle;
             }
         }
+    }
+
+    pub fn measure_shot(&self, shooter_id: &u64) -> Option<u64> {
+        //
+        if let Some(shooter) = self.players.get(&shooter_id.to_string()) {
+            println!("Found shooter with id {}", shooter_id);
+
+            let shot_dir_x = shooter.angle.cos();
+            let shot_dir_y = shooter.angle.sin();
+            let pitch = shooter.pitch;
+
+            let mut closest_hit_distance: f32 = MAX;
+            let mut target_id_opt = None;
+
+            for (target_id_str, target) in &self.players {
+                if &shooter_id.to_string() != target_id_str {
+                    let dx = target.x - shooter.x;
+                    let dy = target.y - shooter.y;
+                    let dist_sq = dx * dx + dy * dy;
+
+                    if dist_sq < SHOT_MAX_DISTANCE {
+                        // Max shot distance
+
+                        // Calculate the dot product of the vector from shooter to target and the shot direction.
+                        // A positive dot product means the target is generally in front of the shooter.
+                        let dot = dx * shot_dir_x + dy * shot_dir_y;
+                        if dot > 0.0 {
+                            // Squared length of the projection of the shooter-to-target vector onto the shot direction vector.
+                            // How far along the shot's path the target is.
+                            let proj_len_sq =
+                                dot * dot / (shot_dir_x * shot_dir_x + shot_dir_y * shot_dir_y);
+
+                            // Squared perpendicular distance from the target to the shot ray: how far off-axis the target is from the shot's line of fire.
+                            let perp_dist_sq = dist_sq - proj_len_sq;
+
+                            let target_width = SPRITE_OTHER_PLAYER_WIDTH * 0.5; // Player hitbox width
+                            if perp_dist_sq < target_width * target_width {
+                                // Vertical check
+                                let dist = dist_sq.sqrt();
+                                let shot_height_at_target =
+                                    shooter.z + CAMERA_HEIGHT_OFFSET + pitch * dist * 0.5; // pitch is a vertical offset, not an angle 
+
+                                // Shot hits someone
+                                if shot_height_at_target > target.z - 0.5
+                                    && shot_height_at_target
+                                        < target.z + SPRITE_OTHER_PLAYER_HEIGHT - 0.5
+                                {
+                                    let target_id = target_id_str.parse::<u64>().unwrap();
+
+                                    // Update closest hit so far
+                                    if dist < closest_hit_distance {
+                                        closest_hit_distance = dist;
+                                        target_id_opt = Some(target_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return target_id_opt;
+        }
+        None
     }
 }
