@@ -1,6 +1,8 @@
+use std::time::Duration;
+
 use crate::consts::{
     DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, PLAYER_JUMP_VELOCITY, PLAYER_PITCH_LIMIT,
-    PLAYER_RADIUS, PLAYER_SPRINT_SPEED_MULTIPLIER,
+    PLAYER_RADIUS, PLAYER_SPRINT_SPEED_MULTIPLIER, SHOT_TIME,
 };
 
 use crate::AnimationState;
@@ -26,7 +28,8 @@ pub struct Player {
     pub frame: usize,
     pub frame_timer: f32,
     pub shooting: bool,
-    pub shoot_timer: f32,
+    //pub shoot_timer: f32,
+    pub shoot_timer: Duration,
 }
 
 impl Player {
@@ -46,7 +49,8 @@ impl Player {
             frame: 0,
             frame_timer: 0.0,
             shooting: false,
-            shoot_timer: 0.0,
+            //shoot_timer: 0.0,
+            shoot_timer: Duration::ZERO,
         }
     }
 
@@ -99,7 +103,7 @@ impl Player {
 
         if input.shoot {
             self.shooting = true;
-            self.shoot_timer = 0.2;
+            self.shoot_timer = SHOT_TIME;
         }
     }
 

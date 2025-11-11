@@ -1,7 +1,7 @@
 use crate::map::World;
 use crate::player::Player;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use crate::consts::{SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH};
 
@@ -128,15 +128,14 @@ impl GameState {
         }
     }
 
-    pub fn update(&mut self, id: String, input: &Input) {
+    pub fn update(&mut self, id: String, input: &Input, dt: Duration) {
         if let Some(player) = self.players.get_mut(&id) {
             player.take_input(input, &self.world);
 
             if player.shooting {
                 player.animation_state = AnimationState::Shooting;
-                if player.shoot_timer > 0.0 {
-                    player.shoot_timer -= 0.1;
-                } else {
+                player.shoot_timer = player.shoot_timer.saturating_sub(dt);
+                if player.shoot_timer.is_zero() {
                     player.shooting = false;
                 }
             } else if input.forth || input.back || input.left || input.right {

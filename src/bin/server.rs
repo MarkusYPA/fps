@@ -172,7 +172,7 @@ fn main() -> std::io::Result<()> {
 
             // Apply inputs and update game state
             for (id, input) in &client_inputs {
-                game_state.update(id.to_string(), input);
+                game_state.update(id.to_string(), input, tick_duration);
             }
 
             // Adjust players' z if jumped

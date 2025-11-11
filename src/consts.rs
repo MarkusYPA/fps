@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use image::Rgba;
 
 pub const WIDTH: usize = 1024;
@@ -42,3 +44,4 @@ pub const CAMERA_PLANE_SCALE: f32 = 0.66;
 pub const GUN_SCALE: f32 = 1.0;
 pub const GUN_X_OFFSET: usize = 190;
 pub const CROSSHAIR_SCALE: f32 = 0.5;
+pub const SHOT_TIME: Duration = Duration::from_millis(35);
