@@ -6,11 +6,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use pixels::{Pixels, SurfaceTexture};
-use winit::dpi::{PhysicalPosition, LogicalSize};
-use winit::event::{DeviceEvent, Event, WindowEvent, MouseButton};
+use winit::dpi::{LogicalSize, PhysicalPosition};
+use winit::event::{DeviceEvent, Event, MouseButton, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
-use winit::window::{CursorGrabMode, WindowBuilder};
+use winit::window::{CursorGrabMode, Window, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
@@ -123,19 +123,10 @@ fn main() -> Result<()> {
             .build(&event_loop)?
     });
 
-    // move cursor to center of window to prevent clicking elsewhere
-    let center_x = window.inner_size().width / 2;
-    let center_y = window.inner_size().height / 2;
-    window
-        .set_cursor_position(PhysicalPosition::new(center_x, center_y))
-        .unwrap();
-
+    // move cursor to center of window to prevent clicking elsewhere and don't allow it to move or show
+    center_and_grab_cursor(window.clone());
     let mut cursor_grabbed = true;
-    window.set_cursor_visible(false);
-    window
-        .set_cursor_grab(CursorGrabMode::Confined)
-        .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
-        .unwrap();
+    let mut first_mouse_move = true; // auto-moving mouse to center is not input
 
     let mut pixels = {
         let window_size = window.inner_size();
@@ -162,7 +153,6 @@ fn main() -> Result<()> {
     let mut frame_count = 0;
     let mut fps_timer = Instant::now();
     let window_clone = window.clone();
-    let mut first_mouse_move = true;    // auto-moving mouse to center is not input
     let mut mouse_dx = 0.0;
     let mut mouse_dy = 0.0;
     let mut prev_input: Option<Input> = None;
@@ -206,6 +196,8 @@ fn main() -> Result<()> {
                 }
                 WindowEvent::Focused(is_focused) => {
                     focused = *is_focused;
+                    center_and_grab_cursor(window_clone.clone());
+                    first_mouse_move = true;
                 }
                 WindowEvent::RedrawRequested => {
                     if let Some(ref gs) = game_state {
@@ -358,4 +350,20 @@ fn main() -> Result<()> {
 
         window_clone.request_redraw();
     })?)
+}
+
+fn center_and_grab_cursor(window: Arc<Window>) {
+    let size = window.inner_size();
+    let center_x = size.width / 2;
+    let center_y = size.height / 2;
+
+    window
+        .set_cursor_position(PhysicalPosition::new(center_x, center_y))
+        .unwrap();
+
+    window.set_cursor_visible(false);
+    window
+        .set_cursor_grab(CursorGrabMode::Confined)
+        .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
+        .unwrap();
 }
