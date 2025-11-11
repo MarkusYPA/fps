@@ -16,6 +16,7 @@ use winit_input_helper::WinitInputHelper;
 use fps::{
     ClientMessage, GameState, Input, ServerMessage,
     consts::{FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WIDTH},
+    player::Player,
     renderer::Renderer,
     spritesheet::hue_variations,
     textures::TextureManager,
@@ -141,7 +142,7 @@ fn main() -> Result<()> {
     // define spritesheets
     let mut texture_manager = TextureManager::new();
     fps::textures::load_game_textures(&mut texture_manager)?;
-    let mut spritesheets = HashMap::new();    
+    let mut spritesheets = HashMap::new();
     for i in 0..10 {
         spritesheets.insert(
             format!("{i}"), // key matches a player's texture property
@@ -304,7 +305,7 @@ fn main() -> Result<()> {
                                             player.animation_state = update.animation_state;
                                         } else {
                                             // New player joined — insert into local game state
-                                            let mut p = fps::Player::new("0".to_string());
+                                            let mut p = Player::new("0".to_string());
                                             p.x = update.x;
                                             p.y = update.y;
                                             p.z = update.z;

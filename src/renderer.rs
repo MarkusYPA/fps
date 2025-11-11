@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use crate::textures::{self};
 use crate::{
+    Direction, GameState,
     consts::{
         CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, FLOOR_COLOR, GUN_SCALE,
-        GUN_X_OFFSET, GUN_Y_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT,
-        SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
+        GUN_X_OFFSET, GUN_Y_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
+        WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
     },
     spritesheet::SpriteSheet,
     textures::TextureManager,
-    Direction, GameState,
 };
 
 fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
@@ -60,7 +60,13 @@ impl Renderer {
         }
     }
 
-    fn draw_sprite_2d(&mut self, texture: &textures::Texture, pos_x: usize, pos_y: usize, scale: f32) {
+    fn draw_sprite_2d(
+        &mut self,
+        texture: &textures::Texture,
+        pos_x: usize,
+        pos_y: usize,
+        scale: f32,
+    ) {
         let scaled_width = (texture.width as f32 * scale) as usize;
         let scaled_height = (texture.height as f32 * scale) as usize;
 
@@ -189,17 +195,16 @@ impl Renderer {
 
                     // x coordinate on the texture
                     let mut tex_x = (wall_x * texture.width as f32) as u32;
-                    if (wall_type == 0 && ray_dir_x > 0.0)
-                        || (wall_type == 1 && ray_dir_y < 0.0)
-                    {
+                    if (wall_type == 0 && ray_dir_x > 0.0) || (wall_type == 1 && ray_dir_y < 0.0) {
                         tex_x = texture.width - tex_x - 1;
                     }
 
                     // save vertical wall line to buffer
                     for y in draw_start..draw_end {
-                        let tex_y_num = (y as isize - HEIGHT as isize / 2 - pitch_offset
-                            - z_offset + line_height / 2)
-                            * texture.height as isize;
+                        let tex_y_num =
+                            (y as isize - HEIGHT as isize / 2 - pitch_offset - z_offset
+                                + line_height / 2)
+                                * texture.height as isize;
                         if line_height == 0 {
                             continue;
                         }

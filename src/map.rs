@@ -28,7 +28,7 @@ impl World {
     }
 
     // Unused for now
-/*     pub fn generate_random_map() -> Self {
+    /*     pub fn generate_random_map() -> Self {
         let mut map = Vec::new();
         for _ in 0..10 {
             let mut row = Vec::new();

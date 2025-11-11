@@ -1,5 +1,6 @@
 use fps::{
-    ClientMessage, GameState, Player, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
+    ClientMessage, GameState, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
+    player::Player,
 };
 use local_ip_address::local_ip;
 use rand::prelude::*;
@@ -95,9 +96,12 @@ fn main() -> std::io::Result<()> {
                                             .unwrap();
                                     socket.send_to(&encoded_welcome, src)?;
 
-                                    game_state
-                                        .players
-                                        .insert(next_id.to_string(), Player::new(sprite_nums[(next_id%10) as usize].to_string()));
+                                    game_state.players.insert(
+                                        next_id.to_string(),
+                                        Player::new(
+                                            sprite_nums[(next_id % 10) as usize].to_string(),
+                                        ),
+                                    );
                                     client_inputs.insert(next_id, fps::Input::default()); // Initialize with default input
                                     next_id += 1;
 
