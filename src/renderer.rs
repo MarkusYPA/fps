@@ -4,8 +4,8 @@ use crate::textures::{self};
 use crate::{
     Direction, GameState,
     consts::{
-        CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, FLOOR_COLOR, GUN_SCALE,
-        GUN_X_OFFSET, GUN_Y_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
+        CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, CROSSHAIR_SCALE, FLOOR_COLOR,
+        GUN_SCALE, GUN_X_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
         WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
     },
     spritesheet::SpriteSheet,
@@ -393,8 +393,15 @@ impl Renderer {
         // Render gun
         if let Some(gun_texture) = self.texture_manager.get_texture("gun").cloned() {
             let gun_x = WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
-            let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize - GUN_Y_OFFSET;
+            let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize;
             self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+        }
+
+        // Render crosshair
+        if let Some(ch_texture) = self.texture_manager.get_texture("crosshair").cloned() {
+            let ch_x = WIDTH / 2 - ((ch_texture.width as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
+            let ch_y = HEIGHT / 2 - ((ch_texture.height as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
+            self.draw_sprite_2d(&ch_texture, ch_x, ch_y, CROSSHAIR_SCALE);
         }
     }
 

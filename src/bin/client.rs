@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use pixels::{Pixels, SurfaceTexture};
-use winit::dpi::LogicalSize;
+use winit::dpi::{PhysicalPosition, LogicalSize};
 use winit::event::{DeviceEvent, Event, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
@@ -123,6 +123,13 @@ fn main() -> Result<()> {
             .build(&event_loop)?
     });
 
+    // move cursor to center of window to prevent clicking elsewhere
+    let center_x = window.inner_size().width / 2;
+    let center_y = window.inner_size().height / 2;
+    window
+        .set_cursor_position(PhysicalPosition::new(center_x, center_y))
+        .unwrap();
+
     let mut cursor_grabbed = true;
     window.set_cursor_visible(false);
     window
@@ -155,6 +162,7 @@ fn main() -> Result<()> {
     let mut frame_count = 0;
     let mut fps_timer = Instant::now();
     let window_clone = window.clone();
+    let mut first_mouse_move = true;    // auto-moving mouse to center is not input
     let mut mouse_dx = 0.0;
     let mut mouse_dy = 0.0;
     let mut prev_input: Option<Input> = None;
@@ -184,9 +192,11 @@ fn main() -> Result<()> {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
-                if cursor_grabbed && focused {
+                if !first_mouse_move && cursor_grabbed && focused {
                     mouse_dx = delta.0 as f32;
                     mouse_dy = delta.1 as f32;
+                } else {
+                    first_mouse_move = false
                 }
             }
             Event::WindowEvent { event, .. } => match event {
