@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 use crate::textures::{self};
 use crate::{
@@ -35,6 +36,10 @@ pub struct Renderer {
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
     pub sprite_sheets: HashMap<String, SpriteSheet>,
+    // Transient hit marker state: when set, renderer will flash a marker at screen center
+    hit_marker_start: Option<Instant>,
+    hit_marker_color: u32,
+    hit_marker_duration: Duration,
 }
 
 struct SpriteInfo<'a> {
@@ -58,7 +63,16 @@ impl Renderer {
             z_buffer: vec![0.0; WIDTH],
             texture_manager,
             sprite_sheets,
+            hit_marker_start: None,
+            hit_marker_color: 0x00FFFFFF,
+            hit_marker_duration: Duration::from_millis(400),
         }
+    }
+
+    // Trigger a transient hit marker flash (caller decides color).
+    pub fn show_hit_marker(&mut self, color: u32) {
+        self.hit_marker_start = Some(Instant::now());
+        self.hit_marker_color = color;
     }
 
     fn draw_sprite_2d(
@@ -406,14 +420,16 @@ impl Renderer {
 
             if player.health > 0 {
                 // Render gun
-                let gun_texture_name = if player.shooting { "gunshot" } else { "gun" };
-                if let Some(gun_texture) =
-                    self.texture_manager.get_texture(gun_texture_name).cloned()
-                {
-                    let gun_x =
-                        WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
-                    let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize;
-                    self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+                if let Some(player) = game_state.players.get(&my_id.to_string()) {
+                    let gun_texture_name = if player.shooting { "gunshot" } else { "gun" };
+                    if let Some(gun_texture) =
+                        self.texture_manager.get_texture(gun_texture_name).cloned()
+                    {
+                        let gun_x =
+                            WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
+                        let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize;
+                        self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+                    }
                 }
 
                 // Render crosshair
@@ -423,6 +439,25 @@ impl Renderer {
                     let ch_y =
                         HEIGHT / 2 - ((ch_texture.height as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
                     self.draw_sprite_2d(&ch_texture, ch_x, ch_y, CROSSHAIR_SCALE);
+                }
+            }
+
+            // Render transient hit marker (overlays crosshair)
+            if let Some(start) = self.hit_marker_start {
+                if start.elapsed() < self.hit_marker_duration {
+                    let cx = (WIDTH / 2) as i32;
+                    let cy = (HEIGHT / 2) as i32;
+                    let inner = 6;
+                    let outer = 14;
+                    let color = self.hit_marker_color;
+
+                    // Draw the four lines of the hit marker
+                    self.draw_line(cx - inner, cy - inner, cx - outer, cy - outer, color);
+                    self.draw_line(cx + inner, cy - inner, cx + outer, cy - outer, color);
+                    self.draw_line(cx - inner, cy + inner, cx - outer, cy + outer, color);
+                    self.draw_line(cx + inner, cy + inner, cx + outer, cy + outer, color);
+                } else {
+                    self.hit_marker_start = None;
                 }
             }
         }

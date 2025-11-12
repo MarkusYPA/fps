@@ -431,6 +431,8 @@ fn main() -> Result<()> {
                             ServerMessage::ShotHit(hit) => {
                                 if hit.shooter_id == my_id {
                                     println!("I shot {}", hit.target_name);
+                                    // Flash a hit marker for successful hit
+                                    renderer.show_hit_marker(0x00FFFFFF);
                                 } else if hit.target_id == my_id {
                                     println!("{} shot me", hit.shooter_name);
                                 }
