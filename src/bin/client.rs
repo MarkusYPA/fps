@@ -107,13 +107,13 @@ fn connect_to_server() -> Result<Option<(UdpSocket, u64, String)>> {
                 println!("Username cannot be empty.");
                 continue;
             }
-            
-        // Send connect message
+
+            // Send connect message
             let connect_message = ClientMessage::Connect(final_username.clone());
             let encoded = bincode::serialize(&connect_message)?;
             socket.send(&encoded)?;
 
-        // Wait for a response with timeout
+            // Wait for a response with timeout
             let start = Instant::now();
             let timeout = Duration::from_secs(2);
             let mut got_response = false;
@@ -121,7 +121,9 @@ fn connect_to_server() -> Result<Option<(UdpSocket, u64, String)>> {
             while start.elapsed() < timeout {
                 match socket.recv_from(&mut buf) {
                     Ok((amt, _)) => {
-                        if let Ok(server_message) = bincode::deserialize::<ServerMessage>(&buf[..amt]) {
+                        if let Ok(server_message) =
+                            bincode::deserialize::<ServerMessage>(&buf[..amt])
+                        {
                             match server_message {
                                 ServerMessage::Welcome(welcome) => {
                                     println!("Connected to server with id: {}", welcome.id);
@@ -420,6 +422,8 @@ fn main() -> Result<()> {
                             ServerMessage::ShotHit(hit) => {
                                 if hit.shooter_id == my_id {
                                     println!("I shot {}", hit.target_name);
+                                    // Flash a hit marker for successful hit
+                                    renderer.show_hit_marker(0x00FFFFFF);
                                 } else if hit.target_id == my_id {
                                     println!("{} shot me", hit.shooter_name);
                                 }

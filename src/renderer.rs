@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 use crate::textures::{self};
 use crate::{
@@ -34,6 +35,10 @@ pub struct Renderer {
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
     pub sprite_sheets: HashMap<String, SpriteSheet>,
+    // Transient hit marker state: when set, renderer will flash a marker at screen center
+    hit_marker_start: Option<Instant>,
+    hit_marker_color: u32,
+    hit_marker_duration: Duration,
 }
 
 struct SpriteInfo<'a> {
@@ -57,7 +62,16 @@ impl Renderer {
             z_buffer: vec![0.0; WIDTH],
             texture_manager,
             sprite_sheets,
+            hit_marker_start: None,
+            hit_marker_color: 0x00FFFFFF,
+            hit_marker_duration: Duration::from_millis(400),
         }
+    }
+
+    // Trigger a transient hit marker flash (caller decides color).
+    pub fn show_hit_marker(&mut self, color: u32) {
+        self.hit_marker_start = Some(Instant::now());
+        self.hit_marker_color = color;
     }
 
     fn draw_sprite_2d(
@@ -195,9 +209,7 @@ impl Renderer {
 
                     // x coordinate on the texture
                     let mut tex_x = (wall_x * texture.width as f32) as u32;
-                    if (wall_type == 0 && ray_dir_x > 0.0)
-                        || (wall_type > 0 && ray_dir_y < 0.0)
-                    {
+                    if (wall_type == 0 && ray_dir_x > 0.0) || (wall_type > 0 && ray_dir_y < 0.0) {
                         tex_x = texture.width - tex_x - 1;
                     }
 
@@ -411,6 +423,25 @@ impl Renderer {
             let ch_x = WIDTH / 2 - ((ch_texture.width as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
             let ch_y = HEIGHT / 2 - ((ch_texture.height as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
             self.draw_sprite_2d(&ch_texture, ch_x, ch_y, CROSSHAIR_SCALE);
+        }
+
+        // Render transient hit marker (overlays crosshair)
+        if let Some(start) = self.hit_marker_start {
+            if start.elapsed() < self.hit_marker_duration {
+                let cx = (WIDTH / 2) as i32;
+                let cy = (HEIGHT / 2) as i32;
+                let inner = 6;
+                let outer = 14;
+                let color = self.hit_marker_color;
+
+                // Draw the four lines of the hit marker
+                self.draw_line(cx - inner, cy - inner, cx - outer, cy - outer, color);
+                self.draw_line(cx + inner, cy - inner, cx + outer, cy - outer, color);
+                self.draw_line(cx - inner, cy + inner, cx - outer, cy + outer, color);
+                self.draw_line(cx + inner, cy + inner, cx + outer, cy + outer, color);
+            } else {
+                self.hit_marker_start = None;
+            }
         }
     }
 
