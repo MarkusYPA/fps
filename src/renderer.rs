@@ -195,7 +195,9 @@ impl Renderer {
 
                     // x coordinate on the texture
                     let mut tex_x = (wall_x * texture.width as f32) as u32;
-                    if (wall_type == 0 && ray_dir_x > 0.0) || (wall_type == 1 && ray_dir_y < 0.0) {
+                    if (wall_type == 0 && ray_dir_x > 0.0)
+                        || (wall_type > 0 && ray_dir_y < 0.0)
+                    {
                         tex_x = texture.width - tex_x - 1;
                     }
 
@@ -218,7 +220,7 @@ impl Renderer {
                             let color = texture.pixels[color_index];
 
                             // Make one side of wall darker
-                            let final_color = if wall_type == 1 {
+                            let final_color = if wall_type > 0 {
                                 color
                             } else {
                                 let r = (color >> 16) & 0xFF;
