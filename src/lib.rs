@@ -1,16 +1,18 @@
 use crate::map::World;
+use crate::player::Player;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::{collections::HashMap, f32::MAX, time::Duration};
 
 use crate::consts::{
-    DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, PLAYER_JUMP_VELOCITY, PLAYER_PITCH_LIMIT,
-    PLAYER_RADIUS, PLAYER_SPRINT_SPEED_MULTIPLIER, SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH,
+    CAMERA_HEIGHT_OFFSET, SHOT_MAX_DISTANCE, SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH,
+    SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
 };
 
 pub mod consts;
 pub mod flags;
 pub mod map;
 pub mod minimap;
+pub mod player;
 pub mod renderer;
 pub mod spritesheet;
 pub mod textures;
@@ -20,6 +22,7 @@ pub enum ClientMessage {
     Connect(String),
     Input(Input),
     Ping,
+    Shot,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -29,6 +32,15 @@ pub enum ServerMessage {
     InitialState(GameState),
     UsernameRejected(String),
     PlayerLeft(u64),
+    ShotHit(Hit),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Hit {
+    pub shooter_id: u64,
+    pub shooter_name: String,
+    pub target_id: u64,
+    pub target_name: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -40,6 +52,7 @@ pub struct Welcome {
 pub enum AnimationState {
     Idle,
     Walking,
+    Shooting,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -63,6 +76,7 @@ pub struct PlayerUpdate {
     pub pitch: f32,
     pub texture: String,
     pub animation_state: AnimationState,
+    pub shooting: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -75,158 +89,7 @@ pub struct Input {
     pub pitch: f32,
     pub jump: bool,
     pub sprint: bool,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Player {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub angle: f32,
-    pub pitch: f32,
-    pub velocity_z: f32,
-    pub move_speed: f32,
-    pub rot_speed: f32,
-    pub texture: String,
-    pub animation_state: AnimationState,
-    pub direction: Direction,
-    pub frame: usize,
-    pub frame_timer: f32,
-}
-
-impl Player {
-    pub fn new(texturename: String) -> Self {
-        Player {
-            x: 1.5,
-            y: 1.5,
-            z: 0.0,
-            angle: std::f32::consts::PI / 2.0,
-            pitch: 0.0,
-            velocity_z: 0.0,
-            move_speed: DEFAULT_PLAYER_MOVE_SPEED,
-            rot_speed: DEFAULT_PLAYER_ROT_SPEED,
-            texture: texturename,
-            animation_state: AnimationState::Idle,
-            direction: Direction::Front,
-            frame: 0,
-            frame_timer: 0.0,
-        }
-    }
-
-    pub fn take_input(&mut self, input: &Input, world: &World) {
-        let mut new_x = self.x;
-        let mut new_y = self.y;
-
-        let mut slower = 1.0;
-        if (input.left || input.right) && (input.forth || input.back) {
-            slower = 0.707;
-        }
-
-        if input.forth {
-            new_x += self.angle.cos() * self.move_speed * slower;
-            new_y += self.angle.sin() * self.move_speed * slower;
-        }
-
-        if input.back {
-            new_x -= self.angle.cos() * self.move_speed * slower;
-            new_y -= self.angle.sin() * self.move_speed * slower;
-        }
-
-        let strafe_x = -self.angle.sin();
-        let strafe_y = self.angle.cos();
-
-        if input.right {
-            new_x += strafe_x * self.move_speed * slower;
-            new_y += strafe_y * self.move_speed * slower;
-        }
-
-        if input.left {
-            new_x -= strafe_x * self.move_speed * slower;
-            new_y -= strafe_y * self.move_speed * slower;
-        }
-
-        if input.sprint {
-            new_x += self.angle.cos() * self.move_speed * PLAYER_SPRINT_SPEED_MULTIPLIER * slower;
-            new_y += self.angle.sin() * self.move_speed * PLAYER_SPRINT_SPEED_MULTIPLIER * slower;
-        }
-
-        self.check_collision_and_move(new_x, new_y, world);
-
-        if input.jump && self.z == 0.0 {
-            self.velocity_z = PLAYER_JUMP_VELOCITY;
-        }
-
-        self.angle += input.turn * self.rot_speed;
-        self.pitch = (self.pitch + input.pitch * self.rot_speed * 2.0)
-            .clamp(-PLAYER_PITCH_LIMIT, PLAYER_PITCH_LIMIT);
-    }
-
-    // Verbose but fast function that avoids heap allocation, vector creation and branching
-    fn check_collision_and_move(&mut self, new_x: f32, new_y: f32, world: &World) {
-        let dx = new_x - self.x;
-        let dy = new_y - self.y;
-
-        let mut clear_x = true;
-        let mut clear_y = true;
-
-        // --- Horizontal movement ---
-        if dx < 0.0 {
-            // Moving left: check left-side corners
-            let cx = new_x - PLAYER_RADIUS;
-            let top_y = self.y + PLAYER_RADIUS;
-            let bottom_y = self.y - PLAYER_RADIUS;
-
-            if world.get_tile(cx.floor() as usize, top_y.floor() as usize) != 0
-                || world.get_tile(cx.floor() as usize, bottom_y.floor() as usize) != 0
-            {
-                clear_x = false;
-            }
-        } else if dx > 0.0 {
-            // Moving right: check right-side corners
-            let cx = new_x + PLAYER_RADIUS;
-            let top_y = self.y + PLAYER_RADIUS;
-            let bottom_y = self.y - PLAYER_RADIUS;
-
-            if world.get_tile(cx.floor() as usize, top_y.floor() as usize) != 0
-                || world.get_tile(cx.floor() as usize, bottom_y.floor() as usize) != 0
-            {
-                clear_x = false;
-            }
-        }
-
-        // --- Vertical movement ---
-        if dy < 0.0 {
-            // Moving down: check bottom corners
-            let cy = new_y - PLAYER_RADIUS;
-            let left_x = self.x - PLAYER_RADIUS;
-            let right_x = self.x + PLAYER_RADIUS;
-
-            if world.get_tile(left_x.floor() as usize, cy.floor() as usize) != 0
-                || world.get_tile(right_x.floor() as usize, cy.floor() as usize) != 0
-            {
-                clear_y = false;
-            }
-        } else if dy > 0.0 {
-            // Moving up: check top corners
-            let cy = new_y + PLAYER_RADIUS;
-            let left_x = self.x - PLAYER_RADIUS;
-            let right_x = self.x + PLAYER_RADIUS;
-
-            if world.get_tile(left_x.floor() as usize, cy.floor() as usize) != 0
-                || world.get_tile(right_x.floor() as usize, cy.floor() as usize) != 0
-            {
-                clear_y = false;
-            }
-        }
-
-        // --- Apply movement ---
-        if clear_x {
-            self.x += dx;
-        }
-        if clear_y {
-            self.y += dy;
-        }
-    }
+    pub shoot: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -278,14 +141,139 @@ impl GameState {
         }
     }
 
-    pub fn update(&mut self, id: String, input: &Input) {
+    pub fn update(&mut self, id: String, input: &Input, dt: Duration) {
         if let Some(player) = self.players.get_mut(&id) {
             player.take_input(input, &self.world);
-            if input.forth || input.back || input.left || input.right {
+
+            if player.shooting {
+                player.animation_state = AnimationState::Shooting;
+                player.shoot_timer = player.shoot_timer.saturating_sub(dt);
+                if player.shoot_timer.is_zero() {
+                    player.shooting = false;
+                }
+            } else if input.forth || input.back || input.left || input.right {
                 player.animation_state = AnimationState::Walking;
             } else {
                 player.animation_state = AnimationState::Idle;
             }
         }
+    }
+
+    pub fn measure_shot(&self, shooter_id: &u64) -> Option<u64> {
+        if let Some(shooter) = self.players.get(&shooter_id.to_string()) {
+            let shot_dir_x = shooter.angle.cos();
+            let shot_dir_y = shooter.angle.sin();
+
+            let wall_dist_sq = self.nearest_wall_distance_squared(shooter, shot_dir_x, shot_dir_y);
+            let mut closest_hit_distance: f32 = MAX;
+            let mut target_id_opt = None;
+
+            for (target_id_str, target) in &self.players {
+                if &shooter_id.to_string() != target_id_str {
+                    let dx = target.x - shooter.x;
+                    let dy = target.y - shooter.y;
+                    let dist_sq = dx * dx + dy * dy;
+
+                    if dist_sq < wall_dist_sq && dist_sq < SHOT_MAX_DISTANCE {
+                        // Calculate the dot product of the vector from shooter to target and the shot direction.
+                        // A positive dot product means the target is generally in front of the shooter.
+                        let dot = dx * shot_dir_x + dy * shot_dir_y;
+                        if dot > 0.0 {
+                            // Squared length of the projection of the shooter-to-target vector onto the shot direction vector.
+                            // How far along the shot's path the target is.
+                            let proj_len_sq =
+                                dot * dot / (shot_dir_x * shot_dir_x + shot_dir_y * shot_dir_y);
+
+                            // Squared perpendicular distance from the target to the shot ray: how far off-axis the target is from the shot's line of fire.
+                            let perp_dist_sq = dist_sq - proj_len_sq;
+
+                            let target_width = SPRITE_OTHER_PLAYER_WIDTH * 0.5; // Player hitbox width
+                            if perp_dist_sq < target_width * target_width {
+                                // Vertical check
+                                let dist = dist_sq.sqrt();
+                                let shot_height_at_target =
+                                    shooter.z + CAMERA_HEIGHT_OFFSET + shooter.pitch * dist * 0.5; // pitch is a vertical offset, not an angle 
+
+                                // Shot hits someone
+                                if shot_height_at_target > target.z - 0.5
+                                    && shot_height_at_target
+                                        < target.z + SPRITE_OTHER_PLAYER_HEIGHT - 0.5
+                                {
+                                    let target_id = target_id_str.parse::<u64>().unwrap();
+
+                                    // Update closest hit so far
+                                    if dist < closest_hit_distance {
+                                        closest_hit_distance = dist;
+                                        target_id_opt = Some(target_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return target_id_opt;
+        }
+        None
+    }
+
+    fn nearest_wall_distance_squared(&self, player: &Player, dir_x: f32, dir_y: f32) -> f32 {
+        // Map position
+        let mut map_x = player.x as isize;
+        let mut map_y = player.y as isize;
+
+        // Delta distance for each step
+        let delta_dist_x = if dir_x == 0.0 {
+            f32::INFINITY
+        } else {
+            (1.0 + (dir_y / dir_x).powi(2)).sqrt()
+        };
+        let delta_dist_y = if dir_y == 0.0 {
+            f32::INFINITY
+        } else {
+            (1.0 + (dir_x / dir_y).powi(2)).sqrt()
+        };
+
+        // Step and initial sideDist
+        let (step_x, mut side_dist_x) = if dir_x < 0.0 {
+            (-1, (player.x - map_x as f32) * delta_dist_x)
+        } else {
+            (1, (map_x as f32 + 1.0 - player.x) * delta_dist_x)
+        };
+
+        let (step_y, mut side_dist_y) = if dir_y < 0.0 {
+            (-1, (player.y - map_y as f32) * delta_dist_y)
+        } else {
+            (1, (map_y as f32 + 1.0 - player.y) * delta_dist_y)
+        };
+
+        // Perform Digital Differential Analyzer
+        let mut hit = false;
+        let mut wall_type = 0;
+        while !hit {
+            if side_dist_x < side_dist_y {
+                side_dist_x += delta_dist_x;
+                map_x += step_x;
+                wall_type = 0;
+            } else {
+                side_dist_y += delta_dist_y;
+                map_y += step_y;
+                wall_type = 1;
+            }
+
+            if self.world.get_tile(map_x as usize, map_y as usize) > 0 {
+                hit = true;
+            }
+        }
+
+        // Hit distance along ray
+        let distance = if wall_type == 0 {
+            side_dist_x - delta_dist_x
+        } else {
+            side_dist_y - delta_dist_y
+        };
+
+        distance * distance
     }
 }

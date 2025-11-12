@@ -1,5 +1,8 @@
 use fps::{
-    ClientMessage, GameState, Player, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
+    ClientMessage, GameState, PlayerUpdate, ServerMessage, Welcome,
+    consts::PORT,
+    flags,
+    player::Player,
 };
 use local_ip_address::local_ip;
 use rand::prelude::*;
@@ -95,9 +98,12 @@ fn main() -> std::io::Result<()> {
                                             .unwrap();
                                     socket.send_to(&encoded_welcome, src)?;
 
-                                    game_state
-                                        .players
-                                        .insert(next_id.to_string(), Player::new(sprite_nums[(next_id%10) as usize].to_string()));
+                                    game_state.players.insert(
+                                        next_id.to_string(),
+                                        Player::new(
+                                            sprite_nums[(next_id % 10) as usize].to_string(),
+                                        ),
+                                    );
                                     client_inputs.insert(next_id, fps::Input::default()); // Initialize with default input
                                     next_id += 1;
 
@@ -116,6 +122,34 @@ fn main() -> std::io::Result<()> {
                         }
                         ClientMessage::Ping => {
                             // Ping received, client is alive
+                        }
+                        ClientMessage::Shot => {
+                            if let Some((shooter_id, shooter_name, _)) = clients.get(&src) {
+                                if let Some(target_id) = game_state.measure_shot(shooter_id) {
+
+                                    let target_name = clients
+                                        .values()
+                                        .find(|(id, _, _)| *id == target_id)
+                                        .unwrap()
+                                        .1
+                                        .clone();
+
+                                    println!("{} shot {}", shooter_name, target_name);
+
+                                    let hit = fps::Hit {
+                                        shooter_id: *shooter_id,
+                                        shooter_name: shooter_name.to_string(),
+                                        target_id,
+                                        target_name,
+                                    };
+                                    let shot_hit_message = ServerMessage::ShotHit(hit);
+                                    let encoded_message =
+                                        bincode::serialize(&shot_hit_message).unwrap();
+                                    for client_addr in clients.keys() {
+                                        socket.send_to(&encoded_message, client_addr).unwrap();
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -168,7 +202,7 @@ fn main() -> std::io::Result<()> {
 
             // Apply inputs and update game state
             for (id, input) in &client_inputs {
-                game_state.update(id.to_string(), input);
+                game_state.update(id.to_string(), input, tick_duration);
             }
 
             // Adjust players' z if jumped
@@ -195,6 +229,7 @@ fn main() -> std::io::Result<()> {
                         pitch: player.pitch,
                         texture: player.texture.clone(),
                         animation_state: player.animation_state.clone(),
+                        shooting: player.shooting,
                     },
                 );
             }

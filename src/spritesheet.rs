@@ -9,13 +9,14 @@ use palette::{FromColor, Hsv, Srgb};
 pub struct SpriteSheet {
     pub idle: [Texture; 8],
     pub walk: [[Texture; 4]; 8],
+    pub shoot: [Texture; 8],
 }
 
 impl SpriteSheet {
     pub fn new(path: &str) -> Result<Self, image::ImageError> {
         let img = image::open(path)?;
 
-        // blob spritesheet frames are 276 x 338 pixels each with 4 vertical lines of pixels in between.
+        // idle: blob spritesheet frames are 276 x 338 pixels each with 4 vertical lines of pixels in between.
         let idle_frames_vec = Self::load_animation_frames(&img, 2, 2, 8, 8, 276, 338, 4, 2)?;
 
         let idle_frames: [Texture; 8] = idle_frames_vec.try_into().map_err(|_| {
@@ -24,7 +25,7 @@ impl SpriteSheet {
             )))
         })?;
 
-        // blob spritesheet frames are 276 x 338 pixels each with 4 vertical and 2 horizontal lines of pixels in between.
+        // walking: frames are 276 x 338 pixels each with 4 vertical and 2 horizontal lines of pixels in between.
         let walk_frames_vec = (0..8)
             .map(|i| -> Result<[Texture; 4], image::ImageError> {
                 let frames =
@@ -43,9 +44,19 @@ impl SpriteSheet {
             )))
         })?;
 
+
+        // shooting
+        let shoot_frames_vec = Self::load_animation_frames(&img, 1122, 342, 8, 1, 276, 338, 4, 2)?;
+        let shoot_frames: [Texture; 8] = shoot_frames_vec.try_into().map_err(|_| {
+            image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic(
+                "Incorrect number of idle frames".into(),
+            )))
+        })?;
+
         Ok(SpriteSheet {
             idle: idle_frames,
             walk: walk_frames,
+            shoot: shoot_frames,
         })
     }
 

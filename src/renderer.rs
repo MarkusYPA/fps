@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use crate::textures::{self};
 use crate::{
+    Direction, GameState,
     consts::{
-        CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, FLOOR_COLOR, GUN_SCALE,
-        GUN_X_OFFSET, GUN_Y_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT,
-        SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
+        CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, CROSSHAIR_SCALE, FLOOR_COLOR,
+        GUN_SCALE, GUN_X_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
+        WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
     },
     spritesheet::SpriteSheet,
     textures::TextureManager,
-    Direction, GameState,
 };
 
 fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
@@ -60,7 +60,13 @@ impl Renderer {
         }
     }
 
-    fn draw_sprite_2d(&mut self, texture: &textures::Texture, pos_x: usize, pos_y: usize, scale: f32) {
+    fn draw_sprite_2d(
+        &mut self,
+        texture: &textures::Texture,
+        pos_x: usize,
+        pos_y: usize,
+        scale: f32,
+    ) {
         let scaled_width = (texture.width as f32 * scale) as usize;
         let scaled_height = (texture.height as f32 * scale) as usize;
 
@@ -197,9 +203,10 @@ impl Renderer {
 
                     // save vertical wall line to buffer
                     for y in draw_start..draw_end {
-                        let tex_y_num = (y as isize - HEIGHT as isize / 2 - pitch_offset
-                            - z_offset + line_height / 2)
-                            * texture.height as isize;
+                        let tex_y_num =
+                            (y as isize - HEIGHT as isize / 2 - pitch_offset - z_offset
+                                + line_height / 2)
+                                * texture.height as isize;
                         if line_height == 0 {
                             continue;
                         }
@@ -270,6 +277,10 @@ impl Renderer {
                         crate::AnimationState::Walking => {
                             &self.sprite_sheets.get(&other_player.texture).unwrap().walk
                                 [direction as usize][other_player.frame]
+                        }
+                        crate::AnimationState::Shooting => {
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().shoot
+                                [direction as usize]
                         }
                     };
 
@@ -386,10 +397,20 @@ impl Renderer {
         self.render_minimap(game_state, my_id);
 
         // Render gun
-        if let Some(gun_texture) = self.texture_manager.get_texture("gun").cloned() {
-            let gun_x = WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
-            let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize - GUN_Y_OFFSET;
-            self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+        if let Some(player) = game_state.players.get(&my_id.to_string()) {
+            let gun_texture_name = if player.shooting { "gunshot" } else { "gun" };
+            if let Some(gun_texture) = self.texture_manager.get_texture(gun_texture_name).cloned() {
+                let gun_x = WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
+                let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize;
+                self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+            }
+        }
+
+        // Render crosshair
+        if let Some(ch_texture) = self.texture_manager.get_texture("crosshair").cloned() {
+            let ch_x = WIDTH / 2 - ((ch_texture.width as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
+            let ch_y = HEIGHT / 2 - ((ch_texture.height as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
+            self.draw_sprite_2d(&ch_texture, ch_x, ch_y, CROSSHAIR_SCALE);
         }
     }
 

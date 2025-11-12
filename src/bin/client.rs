@@ -7,16 +7,17 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use pixels::{Pixels, SurfaceTexture};
-use winit::dpi::LogicalSize;
-use winit::event::{DeviceEvent, Event, WindowEvent};
+use winit::dpi::{LogicalSize, PhysicalPosition};
+use winit::event::{DeviceEvent, Event, MouseButton, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
-use winit::window::{CursorGrabMode, WindowBuilder};
+use winit::window::{CursorGrabMode, Window, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
     ClientMessage, GameState, Input, ServerMessage,
     consts::{FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WIDTH},
+    player::Player,
     renderer::Renderer,
     spritesheet::hue_variations,
     textures::TextureManager,
@@ -202,12 +203,10 @@ fn main() -> Result<()> {
             .build(&event_loop)?
     });
 
+    // move cursor to center of window to prevent clicking elsewhere and don't allow it to move or show
+    center_and_grab_cursor(window.clone());
     let mut cursor_grabbed = true;
-    window.set_cursor_visible(false);
-    window
-        .set_cursor_grab(CursorGrabMode::Confined)
-        .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
-        .unwrap();
+    let mut first_mouse_move = true; // auto-moving mouse to center is not input
 
     let mut pixels = {
         let window_size = window.inner_size();
@@ -263,9 +262,11 @@ fn main() -> Result<()> {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
-                if cursor_grabbed && focused {
+                if !first_mouse_move && cursor_grabbed && focused {
                     mouse_dx = delta.0 as f32;
                     mouse_dy = delta.1 as f32;
+                } else {
+                    first_mouse_move = false
                 }
             }
             Event::WindowEvent { event, .. } => match event {
@@ -275,6 +276,8 @@ fn main() -> Result<()> {
                 }
                 WindowEvent::Focused(is_focused) => {
                     focused = *is_focused;
+                    center_and_grab_cursor(window_clone.clone());
+                    first_mouse_move = true;
                 }
                 WindowEvent::RedrawRequested => {
                     if let Some(ref gs) = game_state {
@@ -334,6 +337,14 @@ fn main() -> Result<()> {
                 turn += 1.0;
             }
 
+            if input.mouse_pressed(MouseButton::Left) {
+                let shot_message = ClientMessage::Shot;
+                let encoded_shot = bincode::serialize(&shot_message).unwrap();
+                if let Err(e) = socket.send(&encoded_shot) {
+                    eprintln!("Error sending shot data: {}", e);
+                }
+            }
+
             let client_input = Input {
                 forth: input.key_held(KeyCode::ArrowUp) || input.key_held(KeyCode::KeyW),
                 back: input.key_held(KeyCode::ArrowDown) || input.key_held(KeyCode::KeyS),
@@ -343,6 +354,7 @@ fn main() -> Result<()> {
                 pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
                 jump: input.key_pressed(KeyCode::Space),
                 sprint: input.key_held(KeyCode::ShiftLeft),
+                shoot: input.mouse_pressed(MouseButton::Left),
             };
             mouse_dx = 0.0;
             mouse_dy = 0.0;
@@ -382,9 +394,10 @@ fn main() -> Result<()> {
                                             player.pitch = update.pitch;
                                             player.texture = update.texture;
                                             player.animation_state = update.animation_state;
+                                            player.shooting = update.shooting;
                                         } else {
                                             // New player joined — insert into local game state
-                                            let mut p = fps::Player::new("0".to_string());
+                                            let mut p = Player::new("0".to_string());
                                             p.x = update.x;
                                             p.y = update.y;
                                             p.z = update.z;
@@ -392,6 +405,7 @@ fn main() -> Result<()> {
                                             p.pitch = update.pitch;
                                             p.texture = update.texture;
                                             p.animation_state = update.animation_state;
+                                            p.shooting = update.shooting;
                                             p.direction = fps::Direction::Front;
                                             gs.players.insert(id.clone(), p);
                                         }
@@ -401,6 +415,13 @@ fn main() -> Result<()> {
                             ServerMessage::PlayerLeft(id) => {
                                 if let Some(ref mut gs) = game_state {
                                     gs.players.remove(&id.to_string());
+                                }
+                            }
+                            ServerMessage::ShotHit(hit) => {
+                                if hit.shooter_id == my_id {
+                                    println!("I shot {}", hit.target_name);
+                                } else if hit.target_id == my_id {
+                                    println!("{} shot me", hit.shooter_name);
                                 }
                             }
                             _ => {}
@@ -424,4 +445,20 @@ fn main() -> Result<()> {
 
         window_clone.request_redraw();
     })?)
+}
+
+fn center_and_grab_cursor(window: Arc<Window>) {
+    let size = window.inner_size();
+    let center_x = size.width / 2;
+    let center_y = size.height / 2;
+
+    window
+        .set_cursor_position(PhysicalPosition::new(center_x, center_y))
+        .unwrap();
+
+    window.set_cursor_visible(false);
+    window
+        .set_cursor_grab(CursorGrabMode::Confined)
+        .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
+        .unwrap();
 }
