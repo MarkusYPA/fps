@@ -10,6 +10,8 @@ pub struct SpriteSheet {
     pub idle: [Texture; 8],
     pub walk: [[Texture; 4]; 8],
     pub shoot: [Texture; 8],
+    pub die: [Texture; 3],
+    pub dead: [Texture; 1],
 }
 
 impl SpriteSheet {
@@ -44,12 +46,27 @@ impl SpriteSheet {
             )))
         })?;
 
-
         // shooting
         let shoot_frames_vec = Self::load_animation_frames(&img, 1122, 342, 8, 1, 276, 338, 4, 2)?;
         let shoot_frames: [Texture; 8] = shoot_frames_vec.try_into().map_err(|_| {
             image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic(
-                "Incorrect number of idle frames".into(),
+                "Incorrect number of shoot frames".into(),
+            )))
+        })?;
+
+        // dying
+        let die_frames_vec = Self::load_animation_frames(&img, 2, 3062, 3, 3, 276, 338, 4, 2)?;
+        let die_frames: [Texture; 3] = die_frames_vec.try_into().map_err(|_| {
+            image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic(
+                "Incorrect number of die frames".into(),
+            )))
+        })?;
+
+        // lying dead
+        let dead_frame_vec = Self::load_animation_frames(&img, 562, 3062, 1, 1, 276, 338, 4, 2)?;
+        let dead_frame: [Texture; 1] = dead_frame_vec.try_into().map_err(|_| {
+            image::ImageError::Parameter(ParameterError::from_kind(ParameterErrorKind::Generic(
+                "Incorrect number of dead frame".into(),
             )))
         })?;
 
@@ -57,6 +74,8 @@ impl SpriteSheet {
             idle: idle_frames,
             walk: walk_frames,
             shoot: shoot_frames,
+            die: die_frames,
+            dead: dead_frame,
         })
     }
 
