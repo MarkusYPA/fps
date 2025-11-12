@@ -1,5 +1,6 @@
-use crate::map::World;
 use crate::player::Player;
+use crate::{consts::RESPAWN_DELAY, map::World};
+use rand::{Rng, rng};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, f32::MAX, time::Duration};
 
@@ -53,6 +54,8 @@ pub enum AnimationState {
     Idle,
     Walking,
     Shooting,
+    Dying,
+    Dead,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -77,6 +80,7 @@ pub struct PlayerUpdate {
     pub texture: String,
     pub animation_state: AnimationState,
     pub shooting: bool,
+    pub health: u16,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -142,10 +146,40 @@ impl GameState {
     }
 
     pub fn update(&mut self, id: String, input: &Input, dt: Duration) {
+
+        // generate respawn position before mutable borrow
+        let respawn_pos = if self
+            .players
+            .get(&id)
+            .map(|p| p.health == 0 && p.death_timer.is_zero())
+            .unwrap_or(false)
+        {
+            Some(self.random_square())
+        } else {
+            None
+        };
+
         if let Some(player) = self.players.get_mut(&id) {
             player.take_input(input, &self.world);
 
-            if player.shooting {
+            if player.dying {
+                player.animation_state = AnimationState::Dying;
+                player.death_timer = player.death_timer.saturating_sub(dt);
+                if player.death_timer < RESPAWN_DELAY {
+                    player.dying = false;
+                }
+            } else if player.health == 0 {
+                player.animation_state = AnimationState::Dead;
+                player.death_timer = player.death_timer.saturating_sub(dt);
+                if player.death_timer.is_zero() {
+                    // respawn player with gamestate?
+                    println!("respawn player now?");
+                    if let Some((map_x, map_y)) = respawn_pos {
+                        println!("random pos: {:?}", respawn_pos);
+                        player.respawn(map_x, map_y);
+                    }
+                }
+            } else if player.shooting {
                 player.animation_state = AnimationState::Shooting;
                 player.shoot_timer = player.shoot_timer.saturating_sub(dt);
                 if player.shoot_timer.is_zero() {
@@ -161,6 +195,10 @@ impl GameState {
 
     pub fn measure_shot(&self, shooter_id: &u64) -> Option<u64> {
         if let Some(shooter) = self.players.get(&shooter_id.to_string()) {
+            if shooter.health == 0 {
+                return None;
+            }
+
             let shot_dir_x = shooter.angle.cos();
             let shot_dir_y = shooter.angle.sin();
 
@@ -192,12 +230,18 @@ impl GameState {
                                 // Vertical check
                                 let dist = dist_sq.sqrt();
                                 let shot_height_at_target =
-                                    shooter.z + CAMERA_HEIGHT_OFFSET + shooter.pitch * dist * 0.5; // pitch is a vertical offset, not an angle 
+                                    shooter.z + CAMERA_HEIGHT_OFFSET + shooter.pitch * dist * 0.5; // pitch is a vertical offset, not an angle
+
+                                // Corpse lies low
+                                let target_height = if target.health == 0 {
+                                    SPRITE_OTHER_PLAYER_HEIGHT * 0.4
+                                } else {
+                                    SPRITE_OTHER_PLAYER_HEIGHT
+                                };
 
                                 // Shot hits someone
                                 if shot_height_at_target > target.z - 0.5
-                                    && shot_height_at_target
-                                        < target.z + SPRITE_OTHER_PLAYER_HEIGHT - 0.5
+                                    && shot_height_at_target < target.z + target_height - 0.5
                                 {
                                     let target_id = target_id_str.parse::<u64>().unwrap();
 
@@ -275,5 +319,31 @@ impl GameState {
         };
 
         distance * distance
+    }
+
+    fn random_square(&self) -> (usize, usize) {
+        let mut rng = rng();
+
+        // Collect all coordinates where the map has a 0
+        let open_tiles: Vec<(usize, usize)> = self
+            .world
+            .map
+            .iter()
+            .enumerate()
+            .flat_map(|(y, row)| {
+                row.iter()
+                    .enumerate()
+                    .filter_map(move |(x, &tile)| if tile == 0 { Some((x, y)) } else { None })
+            })
+            .collect();
+
+        // If no open tiles exist, return (1,1) or handle appropriately
+        if open_tiles.is_empty() {
+            return (1, 1);
+        }
+
+        // Pick a random open tile
+        let index = rng.random_range(0..open_tiles.len());
+        open_tiles[index]
     }
 }

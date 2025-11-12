@@ -9,8 +9,11 @@ pub const PORT: u16 = 8080;
 pub const DEFAULT_MAP_ID: usize = 1;
 pub const MOUSE_SPEED: f32 = 0.06;
 pub const CAMERA_HEIGHT_OFFSET: f32 = 0.1;
+pub const CAMERA_HEIGHT_OFFSET_DEAD: f32 = -0.4;
 pub const CYAN_TRANSPARENT: Rgba<u8> = Rgba([0, 255, 255, 255]);
-pub const FRAME_TIME: f32 = 0.05;
+pub const WALK_FRAME_TIME: f32 = 0.05;
+pub const DIE_FRAME_TIME: f32 = 0.20;
+pub const RESPAWN_DELAY: Duration = Duration::from_secs(4);
 
 pub const DEFAULT_PLAYER_MOVE_SPEED: f32 = 0.035;
 pub const DEFAULT_PLAYER_ROT_SPEED: f32 = 0.03;

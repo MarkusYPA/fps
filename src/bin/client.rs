@@ -1,5 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::cmp;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::net::{SocketAddr, UdpSocket};
@@ -15,8 +16,9 @@ use winit::window::{CursorGrabMode, Window, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
+    AnimationState::{Dying, Walking},
     ClientMessage, GameState, Input, ServerMessage,
-    consts::{FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WIDTH},
+    consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WALK_FRAME_TIME, WIDTH},
     player::Player,
     renderer::Renderer,
     spritesheet::hue_variations,
@@ -247,11 +249,17 @@ fn main() -> Result<()> {
 
         if let Some(gs) = &mut game_state {
             for player in gs.players.values_mut() {
-                if player.animation_state == fps::AnimationState::Walking {
+                if player.animation_state == Walking {
                     player.frame_timer += delta_time;
-                    if player.frame_timer > FRAME_TIME {
+                    if player.frame_timer > WALK_FRAME_TIME {
                         player.frame_timer = 0.0;
                         player.frame = (player.frame + 1) % 4;
+                    }
+                } else if player.animation_state == Dying {
+                    player.frame_timer += delta_time;
+                    if player.frame_timer > DIE_FRAME_TIME {
+                        player.frame_timer = 0.0;
+                        player.frame = cmp::min(player.frame + 1, 2);
                     }
                 } else {
                     player.frame = 0;
@@ -397,6 +405,7 @@ fn main() -> Result<()> {
                                             player.texture = update.texture;
                                             player.animation_state = update.animation_state;
                                             player.shooting = update.shooting;
+                                            player.health = update.health;
                                         } else {
                                             // New player joined — insert into local game state
                                             let mut p = Player::new("0".to_string());
