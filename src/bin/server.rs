@@ -42,6 +42,8 @@ fn main() -> std::io::Result<()> {
     let tick_duration = Duration::from_secs(1) / tick_rate;
     let mut last_tick = Instant::now();
 
+    let mut previous_sprites_len = 0;
+
     socket.set_nonblocking(true)?;
 
     loop {
@@ -124,7 +126,6 @@ fn main() -> std::io::Result<()> {
                         ClientMessage::Shot => {
                             if let Some((shooter_id, shooter_name, _)) = clients.get(&src) {
                                 if let Some(target_id) = game_state.measure_shot(shooter_id) {
-
                                     // reduce target hp
                                     if let Some(target) =
                                         game_state.players.get_mut(&target_id.to_string())
@@ -139,8 +140,6 @@ fn main() -> std::io::Result<()> {
                                         .unwrap()
                                         .1
                                         .clone();
-
-                                    println!("{} shot {}", shooter_name, target_name);
 
                                     let hit = fps::Hit {
                                         shooter_id: *shooter_id,
@@ -243,8 +242,20 @@ fn main() -> std::io::Result<()> {
 
             let encoded_game_update =
                 bincode::serialize(&ServerMessage::GameUpdate(player_updates)).unwrap();
+
             for client_addr in clients.keys() {
                 socket.send_to(&encoded_game_update, client_addr)?;
+            }
+
+            if game_state.sprites.len() != previous_sprites_len {
+                previous_sprites_len = game_state.sprites.len();
+
+                let encoded_sprite_update =
+                    bincode::serialize(&ServerMessage::SpriteUpdate(game_state.sprites.clone())).unwrap();
+
+                for client_addr in clients.keys() {
+                    socket.send_to(&encoded_sprite_update, client_addr)?;
+                }
             }
         }
 

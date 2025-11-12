@@ -423,6 +423,11 @@ fn main() -> Result<()> {
                                     }
                                 }
                             }
+                            ServerMessage::SpriteUpdate(new_sprites) => {
+                                if let Some(ref mut gs) = game_state {
+                                    gs.sprites = new_sprites;
+                                }
+                            }
                             ServerMessage::PlayerLeft(id) => {
                                 if let Some(ref mut gs) = game_state {
                                     gs.players.remove(&id.to_string());

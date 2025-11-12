@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, f32::MAX, time::Duration};
 
 use crate::consts::{
-    CAMERA_HEIGHT_OFFSET, SHOT_MAX_DISTANCE, SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH,
+    CAMERA_HEIGHT_OFFSET, SHOT_MAX_DISTANCE,
     SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
 };
 
@@ -30,6 +30,7 @@ pub enum ClientMessage {
 pub enum ServerMessage {
     Welcome(Welcome),
     GameUpdate(HashMap<String, PlayerUpdate>),
+    SpriteUpdate(Vec<Sprite>),
     InitialState(GameState),
     UsernameRejected(String),
     PlayerLeft(u64),
@@ -120,33 +121,27 @@ impl GameState {
             Some(crate::flags::MapIdentifier::Name(name)) => World::new(Some(0), Some(&name)),
             None => World::new(Some(1), None),
         };
-        let sprites = vec![
-            Sprite {
-                x: 3.2,
-                y: 4.3,
-                z: 0.0,
-                texture: "character2".to_string(),
-                width: SPRITE_NPC_WIDTH,
-                height: SPRITE_NPC_HEIGHT,
-            },
-            Sprite {
-                x: 4.2,
-                y: 4.3,
-                z: 0.0,
-                texture: "character3".to_string(),
-                width: SPRITE_NPC_WIDTH,
-                height: SPRITE_NPC_HEIGHT,
-            },
-        ];
+
         GameState {
             players: HashMap::new(),
             world,
-            sprites,
+            sprites: Vec::new(),
         }
     }
 
-    pub fn update(&mut self, id: String, input: &Input, dt: Duration) {
+    pub fn add_puddle(&mut self, x: f32, y: f32) {
+        let puddle = Sprite {
+            x,
+            y,
+            z: -0.0325,
+            texture: "puddle".to_string(),
+            width: 0.3,
+            height: 0.075,
+        };
+        self.sprites.push(puddle);
+    }
 
+    pub fn update(&mut self, id: String, input: &Input, dt: Duration) {
         // generate respawn position before mutable borrow
         let respawn_pos = if self
             .players
@@ -158,6 +153,8 @@ impl GameState {
         } else {
             None
         };
+
+        let mut puddle_coordiantes = (0.0, 0.0);
 
         if let Some(player) = self.players.get_mut(&id) {
             player.take_input(input, &self.world);
@@ -172,10 +169,8 @@ impl GameState {
                 player.animation_state = AnimationState::Dead;
                 player.death_timer = player.death_timer.saturating_sub(dt);
                 if player.death_timer.is_zero() {
-                    // respawn player with gamestate?
-                    println!("respawn player now?");
-                    if let Some((map_x, map_y)) = respawn_pos {
-                        println!("random pos: {:?}", respawn_pos);
+                    if let Some((map_x, map_y)) = respawn_pos {            
+                        puddle_coordiantes = (player.x, player.y);
                         player.respawn(map_x, map_y);
                     }
                 }
@@ -190,6 +185,10 @@ impl GameState {
             } else {
                 player.animation_state = AnimationState::Idle;
             }
+        }
+
+        if puddle_coordiantes.0 != 0.0 {
+            self.add_puddle(puddle_coordiantes.0, puddle_coordiantes.1);
         }
     }
 
