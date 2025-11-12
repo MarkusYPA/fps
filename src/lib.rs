@@ -160,14 +160,12 @@ impl GameState {
     }
 
     pub fn measure_shot(&self, shooter_id: &u64) -> Option<u64> {
-        //
         if let Some(shooter) = self.players.get(&shooter_id.to_string()) {
-            println!("Found shooter with id {}", shooter_id);
-
             let shot_dir_x = shooter.angle.cos();
             let shot_dir_y = shooter.angle.sin();
             let pitch = shooter.pitch;
 
+            let wall_dist_sq = self.nearest_wall_distance_squared(shooter);
             let mut closest_hit_distance: f32 = MAX;
             let mut target_id_opt = None;
 
@@ -177,9 +175,7 @@ impl GameState {
                     let dy = target.y - shooter.y;
                     let dist_sq = dx * dx + dy * dy;
 
-                    if dist_sq < SHOT_MAX_DISTANCE {
-                        // Max shot distance
-
+                    if dist_sq < wall_dist_sq && dist_sq < SHOT_MAX_DISTANCE {
                         // Calculate the dot product of the vector from shooter to target and the shot direction.
                         // A positive dot product means the target is generally in front of the shooter.
                         let dot = dx * shot_dir_x + dy * shot_dir_y;
@@ -221,5 +217,68 @@ impl GameState {
             return target_id_opt;
         }
         None
+    }
+
+    fn nearest_wall_distance_squared(&self, player: &Player) -> f32 {
+        // Map position
+        let mut map_x = player.x as isize;
+        let mut map_y = player.y as isize;
+
+        // Direction vector
+        let dir_x = player.angle.cos();
+        let dir_y = player.angle.sin();
+
+        // Delta distance for each step
+        let delta_dist_x = if dir_x == 0.0 {
+            f32::INFINITY
+        } else {
+            (1.0 + (dir_y / dir_x).powi(2)).sqrt()
+        };
+        let delta_dist_y = if dir_y == 0.0 {
+            f32::INFINITY
+        } else {
+            (1.0 + (dir_x / dir_y).powi(2)).sqrt()
+        };
+
+        // Step and initial sideDist
+        let (step_x, mut side_dist_x) = if dir_x < 0.0 {
+            (-1, (player.x - map_x as f32) * delta_dist_x)
+        } else {
+            (1, (map_x as f32 + 1.0 - player.x) * delta_dist_x)
+        };
+
+        let (step_y, mut side_dist_y) = if dir_y < 0.0 {
+            (-1, (player.y - map_y as f32) * delta_dist_y)
+        } else {
+            (1, (map_y as f32 + 1.0 - player.y) * delta_dist_y)
+        };
+
+        // Perform Digital Differential Analyzer
+        let mut hit = false;
+        let mut wall_type = 0;
+        while !hit {
+            if side_dist_x < side_dist_y {
+                side_dist_x += delta_dist_x;
+                map_x += step_x;
+                wall_type = 0;
+            } else {
+                side_dist_y += delta_dist_y;
+                map_y += step_y;
+                wall_type = 1;
+            }
+
+            if self.world.get_tile(map_x as usize, map_y as usize) > 0 {
+                hit = true;
+            }
+        }
+
+        // Hit distance along ray
+        let distance = if wall_type == 0 {
+            side_dist_x - delta_dist_x
+        } else {
+            side_dist_y - delta_dist_y
+        };
+
+        distance * distance
     }
 }
