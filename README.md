@@ -46,6 +46,14 @@ or
 cargo run --release --bin server -- -m 3
 ```
 
+You can also select your very own map. If you create a .toml file using the same format as other map files, and add it to the maps dir in root, you can play it using:
+```bash
+cargo run --release --bin server -- --map your_map_name_here
+```
+or
+```bash
+cargo run --release --bin server -- -m your_map_name_here
+```
 
 ## Controls
 
