@@ -90,7 +90,7 @@ fn main() -> std::io::Result<()> {
 
                                     game_state
                                         .players
-                                        .insert(next_id.to_string(), Player::new());
+                                        .insert(next_id.to_string(), Player::new(&game_state.world));
                                     client_inputs.insert(next_id, fps::Input::default()); // Initialize with default input
                                     next_id += 1;
 

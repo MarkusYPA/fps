@@ -1,5 +1,6 @@
 use crate::map::World;
 use serde::{Deserialize, Serialize};
+use rand::Rng;
 use std::collections::HashMap;
 
 use crate::consts::{
@@ -96,10 +97,11 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new() -> Self {
+    pub fn new(world: &World) -> Self {
+        let (x, y) = Player::get_random_spawn_point(&world);
         Player {
-            x: 1.5,
-            y: 1.5,
+            x,
+            y,
             z: 0.0,
             angle: std::f32::consts::PI / 2.0,
             pitch: 0.0,
@@ -114,6 +116,24 @@ impl Player {
         }
     }
 
+    /// Gets a random empty tile on the map
+    pub fn get_random_spawn_point(world: &World) -> (f32, f32) {
+        let mut rng = rand::rng();
+        let mut x = rng.random_range(0..world.map.len());
+        let mut y = rng.random_range(0..world.map[0].len());
+        while world.get_tile(x, y) != 0 {
+            x += 1;
+            if x >= world.map.len() {
+                x = 0;
+                y += 1;
+                if y >= world.map[0].len() {
+                    y = 0;
+                }
+            }
+        }
+        (x as f32 + 0.5, y as f32 + 0.5)
+    }
+    
     pub fn take_input(&mut self, input: &Input, world: &World) {
         let mut new_x = self.x;
         let mut new_y = self.y;

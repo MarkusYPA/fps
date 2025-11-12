@@ -290,7 +290,7 @@ fn main() -> Result<()> {
                                             player.animation_state = update.animation_state;
                                         } else {
                                             // New player joined — insert into local game state
-                                            let mut p = fps::Player::new();
+                                            let mut p = fps::Player::new(&gs.world);
                                             p.x = update.x;
                                             p.y = update.y;
                                             p.z = update.z;
