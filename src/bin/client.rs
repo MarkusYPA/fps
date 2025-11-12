@@ -408,7 +408,7 @@ fn main() -> Result<()> {
                                             player.health = update.health;
                                         } else {
                                             // New player joined — insert into local game state
-                                            let mut p = Player::new("0".to_string());
+                                            let mut p = Player::new("0".to_string(), &gs.world);
                                             p.x = update.x;
                                             p.y = update.y;
                                             p.z = update.z;

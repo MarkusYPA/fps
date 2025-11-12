@@ -1,6 +1,5 @@
 use crate::player::Player;
 use crate::{consts::RESPAWN_DELAY, map::World};
-use rand::{Rng, rng};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, f32::MAX, time::Duration};
 
@@ -154,7 +153,7 @@ impl GameState {
             .map(|p| p.health == 0 && p.death_timer.is_zero())
             .unwrap_or(false)
         {
-            Some(self.random_square())
+            Some(Player::get_random_spawn_point(&self.world))
         } else {
             None
         };
@@ -319,31 +318,5 @@ impl GameState {
         };
 
         distance * distance
-    }
-
-    fn random_square(&self) -> (usize, usize) {
-        let mut rng = rng();
-
-        // Collect all coordinates where the map has a 0
-        let open_tiles: Vec<(usize, usize)> = self
-            .world
-            .map
-            .iter()
-            .enumerate()
-            .flat_map(|(y, row)| {
-                row.iter()
-                    .enumerate()
-                    .filter_map(move |(x, &tile)| if tile == 0 { Some((x, y)) } else { None })
-            })
-            .collect();
-
-        // If no open tiles exist, return (1,1) or handle appropriately
-        if open_tiles.is_empty() {
-            return (1, 1);
-        }
-
-        // Pick a random open tile
-        let index = rng.random_range(0..open_tiles.len());
-        open_tiles[index]
     }
 }
