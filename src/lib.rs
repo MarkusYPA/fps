@@ -175,6 +175,7 @@ impl GameState {
                     // respawn player with gamestate?
                     println!("respawn player now?");
                     if let Some((map_x, map_y)) = respawn_pos {
+                        println!("random pos: {:?}", respawn_pos);
                         player.respawn(map_x, map_y);
                     }
                 }

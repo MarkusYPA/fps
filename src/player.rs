@@ -200,7 +200,7 @@ impl Player {
     pub fn respawn(&mut self, map_x: usize, map_y: usize) {
         self.health = 100;
         self.x = map_x as f32 + 0.5;
-        self.x = map_y as f32 + 0.5;
+        self.y = map_y as f32 + 0.5;
         self.animation_state = AnimationState::Idle;
     }
 }
