@@ -45,8 +45,8 @@ impl Renderer {
         }
     }
 
-    /// Draw a line between two points (simple Bresenham-ish approach)
-    fn draw_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: u32) {
+    // Draw a line between two points (simple Bresenham-ish approach)
+    pub fn draw_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: u32) {
         // Bresenham's line algorithm with i32 coords and clipping checks.
         let dx = (x1 - x0).abs();
         let dy = (y1 - y0).abs();
