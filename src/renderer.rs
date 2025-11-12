@@ -1,10 +1,14 @@
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+
 use crate::textures::{self};
 use crate::{
-    Direction, GameState, Sprite,
+    AnimationState::{Dead, Dying, Idle, Shooting, Walking},
+    Direction, GameState,
     consts::{
-        CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, FLOOR_COLOR, HEIGHT,
-        SPRITE_NPC_HEIGHT, SPRITE_NPC_WIDTH, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
-        WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
+        CAMERA_HEIGHT_OFFSET, CAMERA_HEIGHT_OFFSET_DEAD, CAMERA_PLANE_SCALE, CEILING_COLOR,
+        CROSSHAIR_SCALE, FLOOR_COLOR, GUN_SCALE, GUN_X_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT,
+        SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
     },
     spritesheet::SpriteSheet,
     textures::TextureManager,
@@ -31,8 +35,11 @@ pub struct Renderer {
     pub buffer: Vec<u32>,
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
-    pub sprite_sheet: SpriteSheet,
-    pub sprites: Vec<Sprite>,
+    pub sprite_sheets: HashMap<String, SpriteSheet>,
+    // Transient hit marker state: when set, renderer will flash a marker at screen center
+    hit_marker_start: Option<Instant>,
+    hit_marker_color: u32,
+    hit_marker_duration: Duration,
 }
 
 struct SpriteInfo<'a> {
@@ -47,31 +54,56 @@ struct SpriteInfo<'a> {
 }
 
 impl Renderer {
-    pub fn new(texture_manager: TextureManager, sprite_sheet: SpriteSheet) -> Self {
-        let sprites = vec![
-            Sprite {
-                x: 3.2,
-                y: 4.3,
-                z: 0.0,
-                texture: "character2".to_string(),
-                width: SPRITE_NPC_WIDTH,
-                height: SPRITE_NPC_HEIGHT,
-            },
-            Sprite {
-                x: 4.2,
-                y: 4.3,
-                z: 0.0,
-                texture: "character3".to_string(),
-                width: SPRITE_NPC_WIDTH,
-                height: SPRITE_NPC_HEIGHT,
-            },
-        ];
+    pub fn new(
+        texture_manager: TextureManager,
+        sprite_sheets: HashMap<String, SpriteSheet>,
+    ) -> Self {
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT],
             z_buffer: vec![0.0; WIDTH],
             texture_manager,
-            sprite_sheet,
-            sprites,
+            sprite_sheets,
+            hit_marker_start: None,
+            hit_marker_color: 0x00FFFFFF,
+            hit_marker_duration: Duration::from_millis(400),
+        }
+    }
+
+    // Trigger a transient hit marker flash (caller decides color).
+    pub fn show_hit_marker(&mut self, color: u32) {
+        self.hit_marker_start = Some(Instant::now());
+        self.hit_marker_color = color;
+    }
+
+    fn draw_sprite_2d(
+        &mut self,
+        texture: &textures::Texture,
+        pos_x: usize,
+        pos_y: usize,
+        scale: f32,
+    ) {
+        let scaled_width = (texture.width as f32 * scale) as usize;
+        let scaled_height = (texture.height as f32 * scale) as usize;
+
+        for y in 0..scaled_height {
+            for x in 0..scaled_width {
+                let screen_x = pos_x + x;
+                let screen_y = pos_y + y;
+
+                if screen_x < WIDTH && screen_y < HEIGHT {
+                    let tex_x = (x as f32 / scale) as u32;
+                    let tex_y = (y as f32 / scale) as u32;
+
+                    if tex_x < texture.width && tex_y < texture.height {
+                        let color = texture.pixels[(tex_y * texture.width + tex_x) as usize];
+                        let alpha = (color >> 24) & 0xFF;
+
+                        if alpha > 0 {
+                            self.buffer[screen_y * WIDTH + screen_x] = color;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -91,6 +123,12 @@ impl Renderer {
                     self.buffer[y * WIDTH + x] = FLOOR_COLOR;
                 }
             }
+
+            let camera_offset = if player.health > 0 {
+                CAMERA_HEIGHT_OFFSET
+            } else {
+                CAMERA_HEIGHT_OFFSET_DEAD
+            };
 
             // cast one ray for each pixel in width
             for x in 0..WIDTH {
@@ -142,7 +180,7 @@ impl Renderer {
                         wall_type = 1;
                     }
 
-                    if game_state.world.get_tile(map_x, map_y) == 1 {
+                    if game_state.world.get_tile(map_x, map_y) > 0 {
                         hit = true;
                     }
                 }
@@ -158,26 +196,76 @@ impl Renderer {
 
                 // line hight from distance, start and end points account for jump, pitch and camera offset
                 let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-                let z_offset = ((player.z + CAMERA_HEIGHT_OFFSET) * line_height as f32) as isize;
+                let z_offset = ((player.z + camera_offset) * line_height as f32) as isize;
                 let draw_start = (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
                     .clamp(0, HEIGHT as isize - 1) as usize;
                 let draw_end = (line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
                     .clamp(0, HEIGHT as isize) as usize;
 
-                let wall_color = if wall_type == 1 {
-                    WALL_COLOR_PRIMARY
-                } else {
-                    WALL_COLOR_SECONDARY
-                };
+                let wall_tile = game_state.world.get_tile(map_x, map_y);
+                let wall_texture_name = format!("wall{}", wall_tile);
 
-                // save vertical wall line to buffer
-                for y in draw_start..draw_end {
-                    self.buffer[y * WIDTH + x] = wall_color;
+                if let Some(texture) = self.texture_manager.get_texture(&wall_texture_name) {
+                    // calculate where the wall was hit
+                    let wall_x = if wall_type == 0 {
+                        player.y + perp_wall_dist * ray_dir_y
+                    } else {
+                        player.x + perp_wall_dist * ray_dir_x
+                    };
+                    let wall_x = wall_x - wall_x.floor();
+
+                    // x coordinate on the texture
+                    let mut tex_x = (wall_x * texture.width as f32) as u32;
+                    if (wall_type == 0 && ray_dir_x > 0.0) || (wall_type > 0 && ray_dir_y < 0.0) {
+                        tex_x = texture.width - tex_x - 1;
+                    }
+
+                    // save vertical wall line to buffer
+                    for y in draw_start..draw_end {
+                        let tex_y_num =
+                            (y as isize - HEIGHT as isize / 2 - pitch_offset - z_offset
+                                + line_height / 2)
+                                * texture.height as isize;
+                        if line_height == 0 {
+                            continue;
+                        }
+                        let tex_y = (tex_y_num / line_height)
+                            .max(0)
+                            .min(texture.height as isize - 1)
+                            as u32;
+
+                        let color_index = (tex_y * texture.width + tex_x) as usize;
+                        if color_index < texture.pixels.len() {
+                            let color = texture.pixels[color_index];
+
+                            // Make one side of wall darker
+                            let final_color = if wall_type > 0 {
+                                color
+                            } else {
+                                let r = (color >> 16) & 0xFF;
+                                let g = (color >> 8) & 0xFF;
+                                let b = color & 0xFF;
+                                let a = (color >> 24) & 0xFF;
+                                (a << 24) | ((r / 2) << 16) | ((g / 2) << 8) | (b / 2)
+                            };
+                            self.buffer[y * WIDTH + x] = final_color;
+                        }
+                    }
+                } else {
+                    // Fallback to solid color if texture not found
+                    let wall_color = if wall_type == 1 {
+                        WALL_COLOR_PRIMARY
+                    } else {
+                        WALL_COLOR_SECONDARY
+                    };
+                    for y in draw_start..draw_end {
+                        self.buffer[y * WIDTH + x] = wall_color;
+                    }
                 }
             }
 
             // sprites from world
-            let mut sprite_infos: Vec<SpriteInfo> = self
+            let mut sprite_infos: Vec<SpriteInfo> = game_state
                 .sprites
                 .iter()
                 .map(|s| {
@@ -201,10 +289,23 @@ impl Renderer {
                 if id != &my_id.to_string() {
                     let direction = get_direction(other_player.angle, player.angle);
                     let frame = match other_player.animation_state {
-                        crate::AnimationState::Idle => &self.sprite_sheet.idle[direction as usize],
-                        crate::AnimationState::Walking => {
-                            &self.sprite_sheet.walk[direction as usize][other_player.frame]
+                        Idle => {
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().idle
+                                [direction as usize]
                         }
+                        Walking => {
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().walk
+                                [direction as usize][other_player.frame]
+                        }
+                        Shooting => {
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().shoot
+                                [direction as usize]
+                        }
+                        Dying => {
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().die
+                                [other_player.frame]
+                        }
+                        Dead => &self.sprite_sheets.get(&other_player.texture).unwrap().dead[0],
                     };
 
                     let sprite_x = other_player.x - player.x;
@@ -251,11 +352,10 @@ impl Renderer {
                     // put sprite on the floor if its z is 0
                     let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite_info.height;
                     let world_half = (HEIGHT as f32 / transform_y).abs() * 0.5;
-                    let sprite_vertical_offset = (player.z + CAMERA_HEIGHT_OFFSET - sprite_info.z)
-                        * HEIGHT as f32
-                        / transform_y
-                        - sprite_height * 0.5
-                        + world_half;
+                    let sprite_vertical_offset =
+                        (player.z + camera_offset - sprite_info.z) * HEIGHT as f32 / transform_y
+                            - sprite_height * 0.5
+                            + world_half;
 
                     // start and end points with both z:s, pitch and camera offset accounted for
                     let draw_start_y = (-sprite_height / 2.0
@@ -314,10 +414,53 @@ impl Renderer {
                     }
                 }
             }
-        }
 
-        // Render minimap overlay
-        self.render_minimap(game_state, my_id);
+            // Render minimap overlay
+            self.render_minimap(game_state, my_id);
+
+            if player.health > 0 {
+                // Render gun
+                if let Some(player) = game_state.players.get(&my_id.to_string()) {
+                    let gun_texture_name = if player.shooting { "gunshot" } else { "gun" };
+                    if let Some(gun_texture) =
+                        self.texture_manager.get_texture(gun_texture_name).cloned()
+                    {
+                        let gun_x =
+                            WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
+                        let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize;
+                        self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+                    }
+                }
+
+                // Render crosshair
+                if let Some(ch_texture) = self.texture_manager.get_texture("crosshair").cloned() {
+                    let ch_x =
+                        WIDTH / 2 - ((ch_texture.width as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
+                    let ch_y =
+                        HEIGHT / 2 - ((ch_texture.height as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
+                    self.draw_sprite_2d(&ch_texture, ch_x, ch_y, CROSSHAIR_SCALE);
+                }
+            }
+
+            // Render transient hit marker (overlays crosshair)
+            if let Some(start) = self.hit_marker_start {
+                if start.elapsed() < self.hit_marker_duration {
+                    let cx = (WIDTH / 2) as i32;
+                    let cy = (HEIGHT / 2) as i32;
+                    let inner = 6;
+                    let outer = 14;
+                    let color = self.hit_marker_color;
+
+                    // Draw the four lines of the hit marker
+                    self.draw_line(cx - inner, cy - inner, cx - outer, cy - outer, color);
+                    self.draw_line(cx + inner, cy - inner, cx + outer, cy - outer, color);
+                    self.draw_line(cx - inner, cy + inner, cx - outer, cy + outer, color);
+                    self.draw_line(cx + inner, cy + inner, cx + outer, cy + outer, color);
+                } else {
+                    self.hit_marker_start = None;
+                }
+            }
+        }
     }
 
     pub fn draw_to_buffer(&self, frame: &mut [u8]) {

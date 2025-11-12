@@ -1,7 +1,7 @@
 use image::{self, GenericImageView};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Texture {
     pub width: u32,
     pub height: u32,
@@ -57,10 +57,14 @@ impl TextureManager {
 }
 
 pub fn load_game_textures(texture_manager: &mut TextureManager) -> Result<(), image::ImageError> {
-    texture_manager.load_texture("character1".to_string(), "assets/character1.png")?;
     texture_manager.load_texture("character2".to_string(), "assets/character2.png")?;
     texture_manager.load_texture("character3".to_string(), "assets/character3.png")?;
     texture_manager.load_texture("character4".to_string(), "assets/character4.png")?;
+    texture_manager.load_texture("gun".to_string(), "assets/gun01.png")?;
+    texture_manager.load_texture("gunshot".to_string(), "assets/gun01shot.png")?;
+    texture_manager.load_texture("crosshair".to_string(), "assets/crosshair01.png")?;
+    texture_manager.load_texture("wall1".to_string(), "assets/wall.png")?;
+    texture_manager.load_texture("wall2".to_string(), "assets/bricks.png")?;
     // navigator icon used for the minimap player indicator
     texture_manager.load_texture("navigator".to_string(), "assets/navigator.png")?;
     Ok(())

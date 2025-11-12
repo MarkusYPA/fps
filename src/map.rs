@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use rand::Rng;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct World {
@@ -29,7 +28,7 @@ impl World {
     }
 
     // Unused for now
-/*     pub fn generate_random_map() -> Self {
+    /*     pub fn generate_random_map() -> Self {
         let mut map = Vec::new();
         for _ in 0..10 {
             let mut row = Vec::new();

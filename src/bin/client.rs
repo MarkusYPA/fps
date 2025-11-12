@@ -1,110 +1,199 @@
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::cmp;
+use std::collections::HashMap;
 use std::io::{self, Write};
-use std::net::UdpSocket;
+use std::net::{SocketAddr, UdpSocket};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use pixels::{Pixels, SurfaceTexture};
-use winit::dpi::LogicalSize;
-use winit::event::{DeviceEvent, Event, WindowEvent};
+use winit::dpi::{LogicalSize, PhysicalPosition};
+use winit::event::{DeviceEvent, Event, MouseButton, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
-use winit::window::{CursorGrabMode, WindowBuilder};
+use winit::window::{CursorGrabMode, Window, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
+    AnimationState::{Dying, Walking},
     ClientMessage, GameState, Input, ServerMessage,
-    consts::{HEIGHT, MOUSE_SPEED, PORT, WIDTH},
+    consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WALK_FRAME_TIME, WIDTH},
+    player::Player,
     renderer::Renderer,
+    spritesheet::hue_variations,
     textures::TextureManager,
 };
 
-fn main() -> Result<()> {
-    println!("Enter server IP address:");
-    let mut server_ip = String::new();
-    io::stdin().read_line(&mut server_ip)?;
-    let ip_only = server_ip.trim().rsplitn(2, ':').last().unwrap().trim();
-    let server_address = format!("{}:{}", ip_only, PORT);
+#[derive(Serialize, Deserialize, Default, Debug)]
+struct Config {
+    last_name: Option<String>,
+    recent_servers: Vec<String>,
+}
 
-    let socket = UdpSocket::bind("0.0.0.0:0")?;
-    socket.connect(&server_address)?;
-    socket.set_nonblocking(true)?;
+fn connect_to_server() -> Result<Option<(UdpSocket, u64, String)>> {
+    let config_path = "client_config.toml";
+    let mut config: Config = std::fs::read_to_string(config_path)
+        .ok()
+        .and_then(|content| toml::from_str(&content).ok())
+        .unwrap_or_default();
 
-    let mut buf = [0; 2048];
-    let mut my_id: Option<u64> = None;
-
-    // Outer loop: continue until successfully connected
     loop {
-        print!("Enter a username: ");
-        io::stdout().flush()?; // ensure prompt is printed
-        let mut username = String::new();
-        io::stdin().read_line(&mut username)?;
-        let username = username.trim().to_string();
-
-        // Send connect message
-        let connect_message = ClientMessage::Connect(username.clone());
-        let encoded = bincode::serialize(&connect_message)?;
-        socket.send(&encoded)?;
-
-        // Wait for a response with timeout
-        let start = Instant::now();
-        let timeout = Duration::from_secs(2);
-        let mut got_response = false;
-
-        while start.elapsed() < timeout {
-            match socket.recv_from(&mut buf) {
-                Ok((amt, _)) => {
-                    if let Ok(server_message) = bincode::deserialize::<ServerMessage>(&buf[..amt]) {
-                        match server_message {
-                            ServerMessage::Welcome(welcome) => {
-                                println!("Connected to server with id: {}", welcome.id);
-                                my_id = Some(welcome.id);
-                                got_response = true;
-                                break;
-                            }
-                            ServerMessage::UsernameRejected(reason) => {
-                                eprintln!("Connection rejected: {}", reason);
-                                // prompt for a new username
-                                got_response = true;
-                                break;
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
-                    std::thread::sleep(Duration::from_millis(10));
-                }
-                Err(e) => {
-                    eprintln!("Error receiving message: {}", e);
-                    return Err(e.into());
-                }
-            }
+        // Get server IP
+        println!("Select a server or enter a new IP:");
+        for (i, server) in config.recent_servers.iter().enumerate() {
+            println!("{}: {}", i + 1, server);
         }
+        print!(
+            "Enter selection (1-{}, default: 1), or new IP: ",
+            config.recent_servers.len()
+        );
+        io::stdout().flush()?;
 
-        if got_response {
-            // If we connected successfully, exit loop
-            if let Ok(ServerMessage::Welcome(_)) = bincode::deserialize::<ServerMessage>(&buf[..]) {
-                break;
+        let mut selection = String::new();
+        io::stdin().read_line(&mut selection)?;
+        let selection = selection.trim();
+
+        let server_address_str = if selection.is_empty() {
+            if let Some(first) = config.recent_servers.get(0) {
+                first.clone()
             } else {
-                continue; // username rejected, ask again
+                println!("No recent servers, please enter an IP:");
+                let mut server_ip = String::new();
+                io::stdin().read_line(&mut server_ip)?;
+                server_ip.trim().to_string()
+            }
+        } else if let Ok(num) = selection.parse::<usize>() {
+            if num > 0 && num <= config.recent_servers.len() {
+                config.recent_servers.get(num - 1).cloned().unwrap()
+            } else {
+                println!("Invalid selection. Please enter a new IP:");
+                let mut server_ip = String::new();
+                io::stdin().read_line(&mut server_ip)?;
+                server_ip.trim().to_string()
             }
         } else {
-            eprintln!("No response from server, retrying...");
+            selection.to_string()
+        };
+
+        let server_address: SocketAddr = if server_address_str.contains(':') {
+            server_address_str.parse()?
+        } else {
+            format!("{}:{}", server_address_str, PORT).parse()?
+        };
+
+        let socket = UdpSocket::bind("0.0.0.0:0")?;
+        socket.connect(server_address)?;
+        socket.set_nonblocking(true)?;
+
+        let mut buf = [0; 2048];
+
+        // Inner loop for username attempts
+        loop {
+            print!(
+                "Enter a username (default: {}): ",
+                config.last_name.as_deref().unwrap_or("")
+            );
+            io::stdout().flush()?;
+            let mut username_input = String::new();
+            io::stdin().read_line(&mut username_input)?;
+            let username_trimmed = username_input.trim();
+
+            let final_username = if username_trimmed.is_empty() {
+                config.last_name.clone().unwrap_or_default()
+            } else {
+                username_trimmed.to_string()
+            };
+
+            if final_username.is_empty() {
+                println!("Username cannot be empty.");
+                continue;
+            }
+
+            // Send connect message
+            let connect_message = ClientMessage::Connect(final_username.clone());
+            let encoded = bincode::serialize(&connect_message)?;
+            socket.send(&encoded)?;
+
+            // Wait for a response with timeout
+            let start = Instant::now();
+            let timeout = Duration::from_secs(2);
+            let mut got_response = false;
+
+            while start.elapsed() < timeout {
+                match socket.recv_from(&mut buf) {
+                    Ok((amt, _)) => {
+                        if let Ok(server_message) =
+                            bincode::deserialize::<ServerMessage>(&buf[..amt])
+                        {
+                            match server_message {
+                                ServerMessage::Welcome(welcome) => {
+                                    println!("Connected to server with id: {}", welcome.id);
+
+                                    // Update and save config
+                                    config.last_name = Some(final_username.clone());
+                                    let addr_string = server_address.to_string();
+                                    config.recent_servers.retain(|s| s != &addr_string);
+                                    config.recent_servers.insert(0, addr_string);
+                                    config.recent_servers.truncate(5);
+                                    let config_str = toml::to_string_pretty(&config)?;
+                                    std::fs::write(config_path, config_str)?;
+
+                                    return Ok(Some((socket, welcome.id, final_username)));
+                                }
+                                ServerMessage::UsernameRejected(reason) => {
+                                    eprintln!("Connection rejected: {}", reason);
+                                    // prompt for a new username
+                                    got_response = true;
+                                    break;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                    Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(e) => return Err(e.into()),
+                }
+            }
+
+            if got_response {
+                // Username was rejected, loop again for a new username
+                continue;
+            } else {
+                eprintln!("No response from server. Check the IP and server status.");
+                break; // Breaks inner loop to re-prompt for IP
+            }
+        }
+
+        print!("Try again with a different IP? (y/n): ");
+        io::stdout().flush()?;
+        let mut choice = String::new();
+        io::stdin().read_line(&mut choice)?;
+        if choice.trim().to_lowercase() != "y" {
+            return Ok(None); // Exit if user doesn't want to retry
         }
     }
+}
 
-    let my_id = my_id.ok_or_else(|| anyhow::anyhow!("Failed to receive welcome message"))?;
+fn main() -> Result<()> {
+    let (socket, my_id, _username) = match connect_to_server()? {
+        Some(conn) => conn,
+        None => return Ok(()), // User chose to exit
+    };
 
     let socket_clone = socket.try_clone()?;
-    std::thread::spawn(move || loop {
-        let ping_message = ClientMessage::Ping;
-        let encoded = bincode::serialize(&ping_message).unwrap();
-        if let Err(e) = socket_clone.send(&encoded) {
-            eprintln!("Error sending ping: {}", e);
-            break;
+    std::thread::spawn(move || {
+        loop {
+            let ping_message = ClientMessage::Ping;
+            let encoded = bincode::serialize(&ping_message).unwrap();
+            if let Err(e) = socket_clone.send(&encoded) {
+                eprintln!("Error sending ping: {}", e);
+                break;
+            }
+            std::thread::sleep(Duration::from_secs(1));
         }
-        std::thread::sleep(Duration::from_secs(1));
     });
 
     let event_loop = EventLoop::new()?;
@@ -118,12 +207,10 @@ fn main() -> Result<()> {
             .build(&event_loop)?
     });
 
+    // move cursor to center of window to prevent clicking elsewhere and don't allow it to move or show
+    center_and_grab_cursor(window.clone());
     let mut cursor_grabbed = true;
-    window.set_cursor_visible(false);
-    window
-        .set_cursor_grab(CursorGrabMode::Confined)
-        .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
-        .unwrap();
+    let mut first_mouse_move = true; // auto-moving mouse to center is not input
 
     let mut pixels = {
         let window_size = window.inner_size();
@@ -131,11 +218,20 @@ fn main() -> Result<()> {
         Pixels::new(WIDTH as u32, HEIGHT as u32, surface_texture)?
     };
 
+    // generate hue variations of the spritesheet, if they don't already exist
+    hue_variations("assets/blob0.png");
+
+    // define spritesheets
     let mut texture_manager = TextureManager::new();
     fps::textures::load_game_textures(&mut texture_manager)?;
-    let sprite_sheet = fps::spritesheet::SpriteSheet::new("assets/rott-ianpaulfreeley.png")?;
-
-    let mut renderer = Renderer::new(texture_manager, sprite_sheet);
+    let mut spritesheets = HashMap::new();
+    for i in 0..10 {
+        spritesheets.insert(
+            format!("{i}"), // key matches a player's texture property
+            fps::spritesheet::SpriteSheet::new(&format!("assets/blob{i}.png"))?,
+        );
+    }
+    let mut renderer = Renderer::new(texture_manager, spritesheets);
     let mut game_state: Option<GameState> = None;
 
     let mut frame_count = 0;
@@ -153,11 +249,17 @@ fn main() -> Result<()> {
 
         if let Some(gs) = &mut game_state {
             for player in gs.players.values_mut() {
-                if player.animation_state == fps::AnimationState::Walking {
+                if player.animation_state == Walking {
                     player.frame_timer += delta_time;
-                    if player.frame_timer > 0.150 {
+                    if player.frame_timer > WALK_FRAME_TIME {
                         player.frame_timer = 0.0;
                         player.frame = (player.frame + 1) % 4;
+                    }
+                } else if player.animation_state == Dying {
+                    player.frame_timer += delta_time;
+                    if player.frame_timer > DIE_FRAME_TIME {
+                        player.frame_timer = 0.0;
+                        player.frame = cmp::min(player.frame + 1, 2);
                     }
                 } else {
                     player.frame = 0;
@@ -170,9 +272,11 @@ fn main() -> Result<()> {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
-                if cursor_grabbed && focused {
+                if !first_mouse_move && cursor_grabbed && focused {
                     mouse_dx = delta.0 as f32;
                     mouse_dy = delta.1 as f32;
+                } else {
+                    first_mouse_move = false
                 }
             }
             Event::WindowEvent { event, .. } => match event {
@@ -182,6 +286,8 @@ fn main() -> Result<()> {
                 }
                 WindowEvent::Focused(is_focused) => {
                     focused = *is_focused;
+                    center_and_grab_cursor(window_clone.clone());
+                    first_mouse_move = true;
                 }
                 WindowEvent::RedrawRequested => {
                     if let Some(ref gs) = game_state {
@@ -241,6 +347,14 @@ fn main() -> Result<()> {
                 turn += 1.0;
             }
 
+            if input.mouse_pressed(MouseButton::Left) {
+                let shot_message = ClientMessage::Shot;
+                let encoded_shot = bincode::serialize(&shot_message).unwrap();
+                if let Err(e) = socket.send(&encoded_shot) {
+                    eprintln!("Error sending shot data: {}", e);
+                }
+            }
+
             let client_input = Input {
                 forth: input.key_held(KeyCode::ArrowUp) || input.key_held(KeyCode::KeyW),
                 back: input.key_held(KeyCode::ArrowDown) || input.key_held(KeyCode::KeyS),
@@ -249,6 +363,8 @@ fn main() -> Result<()> {
                 turn,
                 pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
                 jump: input.key_pressed(KeyCode::Space),
+                sprint: input.key_held(KeyCode::ShiftLeft),
+                shoot: input.mouse_pressed(MouseButton::Left),
             };
             mouse_dx = 0.0;
             mouse_dy = 0.0;
@@ -288,9 +404,11 @@ fn main() -> Result<()> {
                                             player.pitch = update.pitch;
                                             player.texture = update.texture;
                                             player.animation_state = update.animation_state;
+                                            player.shooting = update.shooting;
+                                            player.health = update.health;
                                         } else {
                                             // New player joined — insert into local game state
-                                            let mut p = fps::Player::new(&gs.world);
+                                            let mut p = Player::new("0".to_string(), &gs.world);
                                             p.x = update.x;
                                             p.y = update.y;
                                             p.z = update.z;
@@ -298,6 +416,7 @@ fn main() -> Result<()> {
                                             p.pitch = update.pitch;
                                             p.texture = update.texture;
                                             p.animation_state = update.animation_state;
+                                            p.shooting = update.shooting;
                                             p.direction = fps::Direction::Front;
                                             gs.players.insert(id.clone(), p);
                                         }
@@ -307,6 +426,15 @@ fn main() -> Result<()> {
                             ServerMessage::PlayerLeft(id) => {
                                 if let Some(ref mut gs) = game_state {
                                     gs.players.remove(&id.to_string());
+                                }
+                            }
+                            ServerMessage::ShotHit(hit) => {
+                                if hit.shooter_id == my_id {
+                                    println!("I shot {}", hit.target_name);
+                                    // Flash a hit marker for successful hit
+                                    renderer.show_hit_marker(0x00FFFFFF);
+                                } else if hit.target_id == my_id {
+                                    println!("{} shot me", hit.shooter_name);
                                 }
                             }
                             _ => {}
@@ -330,4 +458,20 @@ fn main() -> Result<()> {
 
         window_clone.request_redraw();
     })?)
+}
+
+fn center_and_grab_cursor(window: Arc<Window>) {
+    let size = window.inner_size();
+    let center_x = size.width / 2;
+    let center_y = size.height / 2;
+
+    window
+        .set_cursor_position(PhysicalPosition::new(center_x, center_y))
+        .unwrap();
+
+    window.set_cursor_visible(false);
+    window
+        .set_cursor_grab(CursorGrabMode::Confined)
+        .or_else(|_e| window.set_cursor_grab(CursorGrabMode::Locked))
+        .unwrap();
 }

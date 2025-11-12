@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use image::Rgba;
 
 pub const WIDTH: usize = 1024;
@@ -7,12 +9,18 @@ pub const PORT: u16 = 8080;
 pub const DEFAULT_MAP_ID: usize = 1;
 pub const MOUSE_SPEED: f32 = 0.06;
 pub const CAMERA_HEIGHT_OFFSET: f32 = 0.1;
+pub const CAMERA_HEIGHT_OFFSET_DEAD: f32 = -0.4;
 pub const CYAN_TRANSPARENT: Rgba<u8> = Rgba([0, 255, 255, 255]);
+pub const WALK_FRAME_TIME: f32 = 0.05;
+pub const DIE_FRAME_TIME: f32 = 0.20;
+pub const RESPAWN_DELAY: Duration = Duration::from_secs(4);
 
-pub const DEFAULT_PLAYER_MOVE_SPEED: f32 = 0.05;
+pub const DEFAULT_PLAYER_MOVE_SPEED: f32 = 0.035;
 pub const DEFAULT_PLAYER_ROT_SPEED: f32 = 0.03;
 pub const PLAYER_JUMP_VELOCITY: f32 = 0.028;
 pub const PLAYER_PITCH_LIMIT: f32 = std::f32::consts::PI / 2.5;
+pub const PLAYER_SPRINT_SPEED_MULTIPLIER: f32 = 1.5;
+pub const PLAYER_RADIUS: f32 = 0.2;
 
 pub const MINIMAP_WIDTH: usize = 150;
 pub const MINIMAP_HEIGHT: usize = 150;
@@ -30,8 +38,14 @@ pub const CEILING_COLOR: u32 = 0x00AA_CCFF;
 pub const FLOOR_COLOR: u32 = 0x0055_5555;
 pub const WALL_COLOR_PRIMARY: u32 = 0x008A_7755;
 pub const WALL_COLOR_SECONDARY: u32 = 0x0069_5A41;
-pub const SPRITE_OTHER_PLAYER_WIDTH: f32 = 0.5;
+pub const SPRITE_OTHER_PLAYER_WIDTH: f32 = 0.4;
 pub const SPRITE_OTHER_PLAYER_HEIGHT: f32 = 0.7;
 pub const SPRITE_NPC_WIDTH: f32 = 0.2;
 pub const SPRITE_NPC_HEIGHT: f32 = 0.7;
 pub const CAMERA_PLANE_SCALE: f32 = 0.66;
+
+pub const GUN_SCALE: f32 = 1.0;
+pub const GUN_X_OFFSET: usize = 190;
+pub const CROSSHAIR_SCALE: f32 = 0.5;
+pub const SHOT_TIME: Duration = Duration::from_millis(35);
+pub const SHOT_MAX_DISTANCE: f32 = 200.0;

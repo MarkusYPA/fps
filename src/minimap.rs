@@ -45,8 +45,8 @@ impl Renderer {
         }
     }
 
-    /// Draw a line between two points (simple Bresenham-ish approach)
-    fn draw_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: u32) {
+    // Draw a line between two points (simple Bresenham-ish approach)
+    pub fn draw_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: u32) {
         // Bresenham's line algorithm with i32 coords and clipping checks.
         let dx = (x1 - x0).abs();
         let dy = (y1 - y0).abs();
@@ -119,7 +119,7 @@ impl Renderer {
                 let px = start_x + x * tile_size;
                 let py = start_y + y * tile_size;
                 let tile = game_state.world.get_tile(x, y);
-                let tile_color = if tile == 1 {
+                let tile_color = if tile > 0 {
                     MINIMAP_WALL_COLOR
                 } else {
                     MINIMAP_OPEN_SPACE_COLOR
