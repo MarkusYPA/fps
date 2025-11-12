@@ -15,8 +15,9 @@ use winit::window::{CursorGrabMode, Window, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
+    AnimationState::{Dying, Walking},
     ClientMessage, GameState, Input, ServerMessage,
-    consts::{FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WIDTH},
+    consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WALK_FRAME_TIME, WIDTH},
     player::Player,
     renderer::Renderer,
     spritesheet::hue_variations,
@@ -107,13 +108,13 @@ fn connect_to_server() -> Result<Option<(UdpSocket, u64, String)>> {
                 println!("Username cannot be empty.");
                 continue;
             }
-            
-        // Send connect message
+
+            // Send connect message
             let connect_message = ClientMessage::Connect(final_username.clone());
             let encoded = bincode::serialize(&connect_message)?;
             socket.send(&encoded)?;
 
-        // Wait for a response with timeout
+            // Wait for a response with timeout
             let start = Instant::now();
             let timeout = Duration::from_secs(2);
             let mut got_response = false;
@@ -121,7 +122,9 @@ fn connect_to_server() -> Result<Option<(UdpSocket, u64, String)>> {
             while start.elapsed() < timeout {
                 match socket.recv_from(&mut buf) {
                     Ok((amt, _)) => {
-                        if let Ok(server_message) = bincode::deserialize::<ServerMessage>(&buf[..amt]) {
+                        if let Ok(server_message) =
+                            bincode::deserialize::<ServerMessage>(&buf[..amt])
+                        {
                             match server_message {
                                 ServerMessage::Welcome(welcome) => {
                                     println!("Connected to server with id: {}", welcome.id);
@@ -245,11 +248,17 @@ fn main() -> Result<()> {
 
         if let Some(gs) = &mut game_state {
             for player in gs.players.values_mut() {
-                if player.animation_state == fps::AnimationState::Walking {
+                if player.animation_state == Walking {
                     player.frame_timer += delta_time;
-                    if player.frame_timer > FRAME_TIME {
+                    if player.frame_timer > WALK_FRAME_TIME {
                         player.frame_timer = 0.0;
                         player.frame = (player.frame + 1) % 4;
+                    }
+                } else if player.animation_state == Dying {
+                    player.frame_timer += delta_time;
+                    if player.frame_timer > DIE_FRAME_TIME {
+                        player.frame_timer = 0.0;
+                        player.frame = (player.frame + 1) % 3;
                     }
                 } else {
                     player.frame = 0;
@@ -395,6 +404,7 @@ fn main() -> Result<()> {
                                             player.texture = update.texture;
                                             player.animation_state = update.animation_state;
                                             player.shooting = update.shooting;
+                                            player.health = update.health;
                                         } else {
                                             // New player joined — insert into local game state
                                             let mut p = Player::new("0".to_string());

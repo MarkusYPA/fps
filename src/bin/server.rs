@@ -1,7 +1,5 @@
 use fps::{
-    ClientMessage, GameState, PlayerUpdate, ServerMessage, Welcome,
-    consts::PORT,
-    flags,
+    ClientMessage, GameState, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
     player::Player,
 };
 use local_ip_address::local_ip;
@@ -127,6 +125,14 @@ fn main() -> std::io::Result<()> {
                             if let Some((shooter_id, shooter_name, _)) = clients.get(&src) {
                                 if let Some(target_id) = game_state.measure_shot(shooter_id) {
 
+                                    // reduce target hp
+                                    if let Some(target) =
+                                        game_state.players.get_mut(&target_id.to_string())
+                                    {
+                                        target.take_damage(20);
+                                    }
+
+                                    // Send message about hit to clients
                                     let target_name = clients
                                         .values()
                                         .find(|(id, _, _)| *id == target_id)
@@ -230,6 +236,7 @@ fn main() -> std::io::Result<()> {
                         texture: player.texture.clone(),
                         animation_state: player.animation_state.clone(),
                         shooting: player.shooting,
+                        health: player.health,
                     },
                 );
             }

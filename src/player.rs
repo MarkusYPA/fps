@@ -1,8 +1,7 @@
 use std::time::Duration;
 
 use crate::consts::{
-    DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, PLAYER_JUMP_VELOCITY, PLAYER_PITCH_LIMIT,
-    PLAYER_RADIUS, PLAYER_SPRINT_SPEED_MULTIPLIER, SHOT_TIME,
+    DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, DIE_FRAME_TIME, PLAYER_JUMP_VELOCITY, PLAYER_PITCH_LIMIT, PLAYER_RADIUS, PLAYER_SPRINT_SPEED_MULTIPLIER, SHOT_TIME
 };
 
 use crate::AnimationState;
@@ -29,6 +28,9 @@ pub struct Player {
     pub frame_timer: f32,
     pub shooting: bool,
     pub shoot_timer: Duration,
+    pub health: u16,
+    pub dying: bool,
+    pub death_timer: Duration,
 }
 
 impl Player {
@@ -48,62 +50,68 @@ impl Player {
             frame: 0,
             frame_timer: 0.0,
             shooting: false,
-            //shoot_timer: 0.0,
             shoot_timer: Duration::ZERO,
+            health: 100,
+            dying: false,
+            death_timer: Duration::ZERO,
         }
     }
 
     pub fn take_input(&mut self, input: &Input, world: &World) {
-        let mut new_x = self.x;
-        let mut new_y = self.y;
+        if self.health > 0 {
+            let mut new_x = self.x;
+            let mut new_y = self.y;
 
-        let mut slower = 1.0;
-        if (input.left || input.right) && (input.forth || input.back) {
-            slower = 0.707;
-        }
+            let mut slower = 1.0;
+            if (input.left || input.right) && (input.forth || input.back) {
+                slower = 0.707;
+            }
 
-        if input.forth {
-            new_x += self.angle.cos() * self.move_speed * slower;
-            new_y += self.angle.sin() * self.move_speed * slower;
-        }
+            if input.forth {
+                new_x += self.angle.cos() * self.move_speed * slower;
+                new_y += self.angle.sin() * self.move_speed * slower;
+            }
 
-        if input.back {
-            new_x -= self.angle.cos() * self.move_speed * slower;
-            new_y -= self.angle.sin() * self.move_speed * slower;
-        }
+            if input.back {
+                new_x -= self.angle.cos() * self.move_speed * slower;
+                new_y -= self.angle.sin() * self.move_speed * slower;
+            }
 
-        let strafe_x = -self.angle.sin();
-        let strafe_y = self.angle.cos();
+            let strafe_x = -self.angle.sin();
+            let strafe_y = self.angle.cos();
 
-        if input.right {
-            new_x += strafe_x * self.move_speed * slower;
-            new_y += strafe_y * self.move_speed * slower;
-        }
+            if input.right {
+                new_x += strafe_x * self.move_speed * slower;
+                new_y += strafe_y * self.move_speed * slower;
+            }
 
-        if input.left {
-            new_x -= strafe_x * self.move_speed * slower;
-            new_y -= strafe_y * self.move_speed * slower;
-        }
+            if input.left {
+                new_x -= strafe_x * self.move_speed * slower;
+                new_y -= strafe_y * self.move_speed * slower;
+            }
 
-        if input.sprint {
-            new_x += self.angle.cos() * self.move_speed * PLAYER_SPRINT_SPEED_MULTIPLIER * slower;
-            new_y += self.angle.sin() * self.move_speed * PLAYER_SPRINT_SPEED_MULTIPLIER * slower;
-        }
+            if input.sprint {
+                new_x +=
+                    self.angle.cos() * self.move_speed * PLAYER_SPRINT_SPEED_MULTIPLIER * slower;
+                new_y +=
+                    self.angle.sin() * self.move_speed * PLAYER_SPRINT_SPEED_MULTIPLIER * slower;
+            }
 
-        self.check_collision_and_move(new_x, new_y, world);
+            self.check_collision_and_move(new_x, new_y, world);
 
-        if input.jump && self.z == 0.0 {
-            self.velocity_z = PLAYER_JUMP_VELOCITY;
+            if input.jump && self.z == 0.0 {
+                self.velocity_z = PLAYER_JUMP_VELOCITY;
+            }
+
+            if input.shoot {
+                self.shooting = true;
+                self.shoot_timer = SHOT_TIME;
+            }
         }
 
         self.angle += input.turn * self.rot_speed;
         self.pitch = (self.pitch + input.pitch * self.rot_speed * 2.0)
             .clamp(-PLAYER_PITCH_LIMIT, PLAYER_PITCH_LIMIT);
-
-        if input.shoot {
-            self.shooting = true;
-            self.shoot_timer = SHOT_TIME;
-        }
     }
 
     // Verbose but fast function that avoids heap allocation, vector creation and branching
@@ -170,6 +178,18 @@ impl Player {
         }
         if clear_y {
             self.y += dy;
+        }
+    }
+
+    pub fn take_damage(&mut self, damage: u16){
+        if self.health > damage {
+            self.health -= damage;
+        } else if self.health > 0 {
+            self.dying = true;
+            self.health = 0;
+            self.death_timer = Duration::from_millis((DIE_FRAME_TIME * 3000.0) as u64);
+        } else {
+            self.health = 0;
         }
     }
 }

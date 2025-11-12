@@ -53,6 +53,8 @@ pub enum AnimationState {
     Idle,
     Walking,
     Shooting,
+    Dying,
+    Dead,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -77,6 +79,7 @@ pub struct PlayerUpdate {
     pub texture: String,
     pub animation_state: AnimationState,
     pub shooting: bool,
+    pub health: u16,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
@@ -145,7 +148,15 @@ impl GameState {
         if let Some(player) = self.players.get_mut(&id) {
             player.take_input(input, &self.world);
 
-            if player.shooting {
+            if player.dying {
+                player.animation_state = AnimationState::Dying;
+                player.death_timer = player.death_timer.saturating_sub(dt);
+                if player.death_timer.is_zero() {
+                    player.dying = false;
+                }
+            } else if player.health == 0 {
+                player.animation_state = AnimationState::Dead
+            } else if player.shooting {
                 player.animation_state = AnimationState::Shooting;
                 player.shoot_timer = player.shoot_timer.saturating_sub(dt);
                 if player.shoot_timer.is_zero() {
@@ -161,6 +172,10 @@ impl GameState {
 
     pub fn measure_shot(&self, shooter_id: &u64) -> Option<u64> {
         if let Some(shooter) = self.players.get(&shooter_id.to_string()) {
+            if shooter.health == 0 {
+                return None;
+            }
+
             let shot_dir_x = shooter.angle.cos();
             let shot_dir_y = shooter.angle.sin();
 
@@ -192,12 +207,19 @@ impl GameState {
                                 // Vertical check
                                 let dist = dist_sq.sqrt();
                                 let shot_height_at_target =
-                                    shooter.z + CAMERA_HEIGHT_OFFSET + shooter.pitch * dist * 0.5; // pitch is a vertical offset, not an angle 
+                                    shooter.z + CAMERA_HEIGHT_OFFSET + shooter.pitch * dist * 0.5; // pitch is a vertical offset, not an angle
+
+                                // Corpse lies low
+                                let target_height = if target.health == 0 {
+                                    SPRITE_OTHER_PLAYER_HEIGHT * 0.4
+                                } else {
+                                    SPRITE_OTHER_PLAYER_HEIGHT
+                                };
 
                                 // Shot hits someone
                                 if shot_height_at_target > target.z - 0.5
                                     && shot_height_at_target
-                                        < target.z + SPRITE_OTHER_PLAYER_HEIGHT - 0.5
+                                        < target.z + target_height - 0.5
                                 {
                                     let target_id = target_id_str.parse::<u64>().unwrap();
 

@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use crate::textures::{self};
 use crate::{
+    AnimationState::{Dead, Dying, Idle, Shooting, Walking},
     Direction, GameState,
     consts::{
-        CAMERA_HEIGHT_OFFSET, CAMERA_PLANE_SCALE, CEILING_COLOR, CROSSHAIR_SCALE, FLOOR_COLOR,
-        GUN_SCALE, GUN_X_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
-        WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
+        CAMERA_HEIGHT_OFFSET, CAMERA_HEIGHT_OFFSET_DEAD, CAMERA_PLANE_SCALE, CEILING_COLOR,
+        CROSSHAIR_SCALE, FLOOR_COLOR, GUN_SCALE, GUN_X_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT,
+        SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
     },
     spritesheet::SpriteSheet,
     textures::TextureManager,
@@ -109,6 +110,12 @@ impl Renderer {
                 }
             }
 
+            let camera_offset = if player.health > 0 {
+                CAMERA_HEIGHT_OFFSET
+            } else {
+                CAMERA_HEIGHT_OFFSET_DEAD
+            };
+
             // cast one ray for each pixel in width
             for x in 0..WIDTH {
                 // ray direction
@@ -175,7 +182,7 @@ impl Renderer {
 
                 // line hight from distance, start and end points account for jump, pitch and camera offset
                 let line_height = (HEIGHT as f32 / perp_wall_dist) as isize;
-                let z_offset = ((player.z + CAMERA_HEIGHT_OFFSET) * line_height as f32) as isize;
+                let z_offset = ((player.z + camera_offset) * line_height as f32) as isize;
                 let draw_start = (-line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
                     .clamp(0, HEIGHT as isize - 1) as usize;
                 let draw_end = (line_height / 2 + HEIGHT as isize / 2 + pitch_offset + z_offset)
@@ -195,9 +202,7 @@ impl Renderer {
 
                     // x coordinate on the texture
                     let mut tex_x = (wall_x * texture.width as f32) as u32;
-                    if (wall_type == 0 && ray_dir_x > 0.0)
-                        || (wall_type > 0 && ray_dir_y < 0.0)
-                    {
+                    if (wall_type == 0 && ray_dir_x > 0.0) || (wall_type > 0 && ray_dir_y < 0.0) {
                         tex_x = texture.width - tex_x - 1;
                     }
 
@@ -270,18 +275,23 @@ impl Renderer {
                 if id != &my_id.to_string() {
                     let direction = get_direction(other_player.angle, player.angle);
                     let frame = match other_player.animation_state {
-                        crate::AnimationState::Idle => {
+                        Idle => {
                             &self.sprite_sheets.get(&other_player.texture).unwrap().idle
                                 [direction as usize]
                         }
-                        crate::AnimationState::Walking => {
+                        Walking => {
                             &self.sprite_sheets.get(&other_player.texture).unwrap().walk
                                 [direction as usize][other_player.frame]
                         }
-                        crate::AnimationState::Shooting => {
+                        Shooting => {
                             &self.sprite_sheets.get(&other_player.texture).unwrap().shoot
                                 [direction as usize]
                         }
+                        Dying => {
+                            &self.sprite_sheets.get(&other_player.texture).unwrap().die
+                                [direction as usize] // use death frame
+                        }
+                        Dead => &self.sprite_sheets.get(&other_player.texture).unwrap().dead[0],
                     };
 
                     let sprite_x = other_player.x - player.x;
@@ -328,11 +338,10 @@ impl Renderer {
                     // put sprite on the floor if its z is 0
                     let sprite_height = (HEIGHT as f32 / transform_y).abs() * sprite_info.height;
                     let world_half = (HEIGHT as f32 / transform_y).abs() * 0.5;
-                    let sprite_vertical_offset = (player.z + CAMERA_HEIGHT_OFFSET - sprite_info.z)
-                        * HEIGHT as f32
-                        / transform_y
-                        - sprite_height * 0.5
-                        + world_half;
+                    let sprite_vertical_offset =
+                        (player.z + camera_offset - sprite_info.z) * HEIGHT as f32 / transform_y
+                            - sprite_height * 0.5
+                            + world_half;
 
                     // start and end points with both z:s, pitch and camera offset accounted for
                     let draw_start_y = (-sprite_height / 2.0
@@ -391,26 +400,31 @@ impl Renderer {
                     }
                 }
             }
-        }
 
-        // Render minimap overlay
-        self.render_minimap(game_state, my_id);
+            // Render minimap overlay
+            self.render_minimap(game_state, my_id);
+            
+            if player.health > 0 {
+                // Render gun
+                let gun_texture_name = if player.shooting { "gunshot" } else { "gun" };
+                if let Some(gun_texture) =
+                    self.texture_manager.get_texture(gun_texture_name).cloned()
+                {
+                    let gun_x =
+                        WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
+                    let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize;
+                    self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+                }
 
-        // Render gun
-        if let Some(player) = game_state.players.get(&my_id.to_string()) {
-            let gun_texture_name = if player.shooting { "gunshot" } else { "gun" };
-            if let Some(gun_texture) = self.texture_manager.get_texture(gun_texture_name).cloned() {
-                let gun_x = WIDTH - (gun_texture.width as f32 * GUN_SCALE) as usize - GUN_X_OFFSET;
-                let gun_y = HEIGHT - (gun_texture.height as f32 * GUN_SCALE) as usize;
-                self.draw_sprite_2d(&gun_texture, gun_x, gun_y, GUN_SCALE);
+                // Render crosshair
+                if let Some(ch_texture) = self.texture_manager.get_texture("crosshair").cloned() {
+                    let ch_x =
+                        WIDTH / 2 - ((ch_texture.width as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
+                    let ch_y =
+                        HEIGHT / 2 - ((ch_texture.height as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
+                    self.draw_sprite_2d(&ch_texture, ch_x, ch_y, CROSSHAIR_SCALE);
+                }
             }
-        }
-
-        // Render crosshair
-        if let Some(ch_texture) = self.texture_manager.get_texture("crosshair").cloned() {
-            let ch_x = WIDTH / 2 - ((ch_texture.width as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
-            let ch_y = HEIGHT / 2 - ((ch_texture.height as f32 * CROSSHAIR_SCALE) / 2.0) as usize;
-            self.draw_sprite_2d(&ch_texture, ch_x, ch_y, CROSSHAIR_SCALE);
         }
     }
 
