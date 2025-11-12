@@ -163,9 +163,8 @@ impl GameState {
         if let Some(shooter) = self.players.get(&shooter_id.to_string()) {
             let shot_dir_x = shooter.angle.cos();
             let shot_dir_y = shooter.angle.sin();
-            let pitch = shooter.pitch;
 
-            let wall_dist_sq = self.nearest_wall_distance_squared(shooter);
+            let wall_dist_sq = self.nearest_wall_distance_squared(shooter, shot_dir_x, shot_dir_y);
             let mut closest_hit_distance: f32 = MAX;
             let mut target_id_opt = None;
 
@@ -193,7 +192,7 @@ impl GameState {
                                 // Vertical check
                                 let dist = dist_sq.sqrt();
                                 let shot_height_at_target =
-                                    shooter.z + CAMERA_HEIGHT_OFFSET + pitch * dist * 0.5; // pitch is a vertical offset, not an angle 
+                                    shooter.z + CAMERA_HEIGHT_OFFSET + shooter.pitch * dist * 0.5; // pitch is a vertical offset, not an angle 
 
                                 // Shot hits someone
                                 if shot_height_at_target > target.z - 0.5
@@ -219,14 +218,10 @@ impl GameState {
         None
     }
 
-    fn nearest_wall_distance_squared(&self, player: &Player) -> f32 {
+    fn nearest_wall_distance_squared(&self, player: &Player, dir_x: f32, dir_y: f32) -> f32 {
         // Map position
         let mut map_x = player.x as isize;
         let mut map_y = player.y as isize;
-
-        // Direction vector
-        let dir_x = player.angle.cos();
-        let dir_y = player.angle.sin();
 
         // Delta distance for each step
         let delta_dist_x = if dir_x == 0.0 {
