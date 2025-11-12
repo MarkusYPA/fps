@@ -1,5 +1,6 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::cmp;
 use std::collections::HashMap;
 use std::io::{self, Write};
 use std::net::{SocketAddr, UdpSocket};
@@ -258,7 +259,7 @@ fn main() -> Result<()> {
                     player.frame_timer += delta_time;
                     if player.frame_timer > DIE_FRAME_TIME {
                         player.frame_timer = 0.0;
-                        player.frame = (player.frame + 1) % 3;
+                        player.frame = cmp::min(player.frame + 1, 2);
                     }
                 } else {
                     player.frame = 0;

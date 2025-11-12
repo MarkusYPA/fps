@@ -289,7 +289,7 @@ impl Renderer {
                         }
                         Dying => {
                             &self.sprite_sheets.get(&other_player.texture).unwrap().die
-                                [direction as usize] // use death frame
+                                [other_player.frame]
                         }
                         Dead => &self.sprite_sheets.get(&other_player.texture).unwrap().dead[0],
                     };
@@ -403,7 +403,7 @@ impl Renderer {
 
             // Render minimap overlay
             self.render_minimap(game_state, my_id);
-            
+
             if player.health > 0 {
                 // Render gun
                 let gun_texture_name = if player.shooting { "gunshot" } else { "gun" };

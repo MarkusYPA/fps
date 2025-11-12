@@ -1,7 +1,9 @@
 use std::time::Duration;
+use std::usize;
 
 use crate::consts::{
-    DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, DIE_FRAME_TIME, PLAYER_JUMP_VELOCITY, PLAYER_PITCH_LIMIT, PLAYER_RADIUS, PLAYER_SPRINT_SPEED_MULTIPLIER, SHOT_TIME
+    DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, DIE_FRAME_TIME, PLAYER_JUMP_VELOCITY,
+    PLAYER_PITCH_LIMIT, PLAYER_RADIUS, PLAYER_SPRINT_SPEED_MULTIPLIER, RESPAWN_DELAY, SHOT_TIME,
 };
 
 use crate::AnimationState;
@@ -181,15 +183,24 @@ impl Player {
         }
     }
 
-    pub fn take_damage(&mut self, damage: u16){
+    pub fn take_damage(&mut self, damage: u16) {
         if self.health > damage {
             self.health -= damage;
         } else if self.health > 0 {
             self.dying = true;
             self.health = 0;
-            self.death_timer = Duration::from_millis((DIE_FRAME_TIME * 3000.0) as u64);
+            // Three frames, at 0,2 seconds. 3000 * 0.2 milliseconds = 0.6 seconds?
+            self.death_timer =
+                Duration::from_millis((DIE_FRAME_TIME * 3000.0) as u64) + RESPAWN_DELAY;
         } else {
             self.health = 0;
         }
+    }
+
+    pub fn respawn(&mut self, map_x: usize, map_y: usize) {
+        self.health = 100;
+        self.x = map_x as f32 + 0.5;
+        self.x = map_y as f32 + 0.5;
+        self.animation_state = AnimationState::Idle;
     }
 }
