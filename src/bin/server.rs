@@ -98,12 +98,11 @@ fn main() -> std::io::Result<()> {
                                             .unwrap();
                                     socket.send_to(&encoded_welcome, src)?;
 
-                                    game_state.players.insert(
-                                        next_id.to_string(),
-                                        Player::new(
-                                            sprite_nums[(next_id % 10) as usize].to_string(),
-                                        ),
+                                    let new_player = Player::new(
+                                        sprite_nums[(next_id % 10) as usize].to_string(),
+                                        &game_state.world,
                                     );
+                                    game_state.players.insert(next_id.to_string(), new_player);
                                     client_inputs.insert(next_id, fps::Input::default()); // Initialize with default input
                                     next_id += 1;
 

@@ -1,5 +1,5 @@
 use std::time::Duration;
-use std::usize;
+use rand::Rng;
 
 use crate::consts::{
     DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, DIE_FRAME_TIME, PLAYER_JUMP_VELOCITY,
@@ -36,10 +36,11 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(texturename: String) -> Self {
+    pub fn new(texturename: String, world: &World) -> Self {
+        let (x, y) = Player::get_random_spawn_point(world);
         Player {
-            x: 1.5,
-            y: 1.5,
+            x,
+            y,
             z: 0.0,
             angle: std::f32::consts::PI / 2.0,
             pitch: 0.0,
@@ -197,10 +198,30 @@ impl Player {
         }
     }
 
-    pub fn respawn(&mut self, map_x: usize, map_y: usize) {
+    pub fn respawn(&mut self, map_x: f32, map_y: f32) {
         self.health = 100;
-        self.x = map_x as f32 + 0.5;
-        self.y = map_y as f32 + 0.5;
+        self.x = map_x;
+        self.y = map_y;
         self.animation_state = AnimationState::Idle;
     }
+
+    /// Gets a random empty tile on the map
+    pub fn get_random_spawn_point(world: &World) -> (f32, f32) {
+        let mut rng = rand::rng();
+        let mut x = rng.random_range(0..world.map.len());
+        let mut y = rng.random_range(0..world.map[0].len());
+        while world.get_tile(x, y) != 0 {
+            x += 1;
+            if x >= world.map.len() {
+                x = 0;
+                y += 1;
+                if y >= world.map[0].len() {
+                    y = 0;
+                }
+            }
+        }
+        // + 0.5 to center the player on the tile
+        (x as f32 + 0.5, y as f32 + 0.5)
+    }
+        
 }
