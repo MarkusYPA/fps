@@ -15,10 +15,8 @@ use std::{collections::HashMap, f32::MAX, time::Duration};
 pub struct GameState {
     pub players: HashMap<String, Player>,
     pub world: World,
-    first_floor_sprite_id: u32,
-    last_floor_sprite_id: u32,
+    floor_sprite_id: u32,
     pub floor_sprites: HashMap<u32, Sprite>,
-    //pub floor_sprite_timeouts: HashMap<u32, Duration>,
 }
 
 impl GameState {
@@ -32,8 +30,7 @@ impl GameState {
         GameState {
             players: HashMap::new(),
             world,
-            first_floor_sprite_id: 0,
-            last_floor_sprite_id: 0,
+            floor_sprite_id: 0,
             floor_sprites: HashMap::new(),
         }
     }
@@ -48,8 +45,8 @@ impl GameState {
             height: 0.075,
         };
 
-        self.floor_sprites.insert(self.last_floor_sprite_id, puddle);
-        self.last_floor_sprite_id += 1;
+        self.floor_sprites.insert(self.floor_sprite_id, puddle);
+        self.floor_sprite_id += 1;
     }
 
     pub fn limit_sprites(&mut self) -> bool {
