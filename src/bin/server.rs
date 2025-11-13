@@ -212,7 +212,7 @@ fn main() -> std::io::Result<()> {
             }
 
             // remove puddles if they hit timeout
-            if game_state.check_sprites(tick_duration) {
+            if game_state.limit_sprites() {
                 sprites_changed = true;
             }
 
@@ -255,7 +255,7 @@ fn main() -> std::io::Result<()> {
 
             if sprites_changed {
                 let encoded_sprite_update =
-                    bincode::serialize(&ServerMessage::SpriteUpdate(game_state.sprites.clone())).unwrap();
+                    bincode::serialize(&ServerMessage::SpriteUpdate(game_state.floor_sprites.clone())).unwrap();
                 for client_addr in clients.keys() {
                     socket.send_to(&encoded_sprite_update, client_addr)?;
                 }

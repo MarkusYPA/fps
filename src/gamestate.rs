@@ -1,8 +1,9 @@
 use crate::AnimationState;
 use crate::Input;
 use crate::Sprite;
+use crate::consts::MAX_PUDDLES;
 use crate::consts::{
-    CAMERA_HEIGHT_OFFSET, PUDDLE_TIMEOUT, SHOT_MAX_DISTANCE, SPRITE_OTHER_PLAYER_HEIGHT,
+    CAMERA_HEIGHT_OFFSET, SHOT_MAX_DISTANCE, SPRITE_OTHER_PLAYER_HEIGHT,
     SPRITE_OTHER_PLAYER_WIDTH,
 };
 use crate::player::Player;
@@ -14,9 +15,10 @@ use std::{collections::HashMap, f32::MAX, time::Duration};
 pub struct GameState {
     pub players: HashMap<String, Player>,
     pub world: World,
-    floor_sprite_id: u32,
+    first_floor_sprite_id: u32,
+    last_floor_sprite_id: u32,
     pub floor_sprites: HashMap<u32, Sprite>,
-    pub floor_sprite_timeouts: HashMap<u32, Duration>,
+    //pub floor_sprite_timeouts: HashMap<u32, Duration>,
 }
 
 impl GameState {
@@ -30,9 +32,9 @@ impl GameState {
         GameState {
             players: HashMap::new(),
             world,
-            floor_sprite_id: 0,
+            first_floor_sprite_id: 0,
+            last_floor_sprite_id: 0,
             floor_sprites: HashMap::new(),
-            floor_sprite_timeouts: HashMap::new(),
         }
     }
 
@@ -45,33 +47,21 @@ impl GameState {
             width: 0.3,
             height: 0.075,
         };
-        //self.sprites.push(puddle);
-        self.floor_sprites.insert(self.floor_sprite_id, puddle);
-        self.floor_sprite_timeouts.insert(self.floor_sprite_id, PUDDLE_TIMEOUT);
-        self.floor_sprite_id += 1;
 
-        println!("sprite inserted");
+        self.floor_sprites.insert(self.last_floor_sprite_id, puddle);
+        self.last_floor_sprite_id += 1;
     }
 
-    pub fn check_sprites(&mut self, dt: Duration) -> bool {
-        let mut to_remove = Vec::new();
+    pub fn limit_sprites(&mut self) -> bool {
         let mut changed = false;
 
-        // Iterate mutably but don't remove yet
-        for (id, dur) in self.floor_sprite_timeouts.iter_mut() {
-            *dur = dur.saturating_sub(dt);
-
-            if dur.is_zero() {
-                to_remove.push(*id);
+        while self.floor_sprites.len() > MAX_PUDDLES {
+            if let Some(min_key) = self.floor_sprites.keys().min().cloned() {
+                self.floor_sprites.remove(&min_key);
                 changed = true;
+            } else {
+                break;
             }
-        }
-
-        // Now remove outside the borrow
-        for id in to_remove {
-            self.floor_sprites.remove(&id);
-            self.floor_sprite_timeouts.remove(&id);
-            println!("sprite removed");
         }
 
         changed
