@@ -1,6 +1,6 @@
 use fps::{
-    ClientMessage, GameState, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
-    player::Player,
+    ClientMessage, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
+    player::Player, gamestate::GameState,
 };
 use local_ip_address::local_ip;
 use rand::prelude::*;
