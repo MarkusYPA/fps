@@ -12,7 +12,7 @@ use winit::dpi::{LogicalSize, PhysicalPosition};
 use winit::event::{DeviceEvent, Event, MouseButton, WindowEvent};
 use winit::event_loop::EventLoop;
 use winit::keyboard::KeyCode;
-use winit::window::{CursorGrabMode, Window, WindowBuilder};
+use winit::window::{CursorGrabMode, Fullscreen, Window, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
@@ -289,6 +289,15 @@ fn main() -> Result<()> {
                     center_and_grab_cursor(window_clone.clone());
                     first_mouse_move = true;
                 }
+                WindowEvent::Resized(size) => {
+                    // Update pixels surface to match new window size
+                    let _ = pixels.resize_surface(size.width, size.height);
+                }
+                WindowEvent::ScaleFactorChanged { .. } => {
+                    // DPI / scale factor changed – query current window size and update surface
+                    let size = window_clone.inner_size();
+                    let _ = pixels.resize_surface(size.width, size.height);
+                }
                 WindowEvent::RedrawRequested => {
                     if let Some(ref gs) = game_state {
                         renderer.render(gs, my_id);
@@ -337,6 +346,18 @@ fn main() -> Result<()> {
                         }
                     })
                     .unwrap();
+            }
+
+            // Fullscreen toggle (P)
+            if input.key_pressed(KeyCode::KeyP) {
+                if window_clone.fullscreen().is_some() {
+                    window_clone.set_fullscreen(None);
+                } else {
+                    window_clone.set_fullscreen(Some(Fullscreen::Borderless(None)));
+                }
+                // Update the pixels surface to match new window state
+                let size = window_clone.inner_size();
+                let _ = pixels.resize_surface(size.width, size.height);
             }
 
             let mut turn = mouse_dx * MOUSE_SPEED;

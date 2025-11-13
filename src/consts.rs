@@ -2,8 +2,9 @@ use std::time::Duration;
 
 use image::Rgba;
 
-pub const WIDTH: usize = 1024;
-pub const HEIGHT: usize = 768;
+// Default internal render resolution. Change to 1920x1080 for Full HD.
+pub const WIDTH: usize = 1920;
+pub const HEIGHT: usize = 1080;
 pub const PORT: u16 = 8080;
 
 pub const DEFAULT_MAP_ID: usize = 1;
