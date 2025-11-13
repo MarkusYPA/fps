@@ -42,8 +42,6 @@ fn main() -> std::io::Result<()> {
     let tick_duration = Duration::from_secs(1) / tick_rate;
     let mut last_tick = Instant::now();
 
-    let mut previous_sprites_len = 0;
-
     socket.set_nonblocking(true)?;
 
     loop {
@@ -209,6 +207,9 @@ fn main() -> std::io::Result<()> {
                 game_state.update(id.to_string(), input, tick_duration);
             }
 
+            // remove puddles if they hit timeout
+            let sprites_changed = game_state.check_sprites(tick_duration);
+
             // Adjust players' z if jumped
             for player in game_state.players.values_mut() {
                 player.z += player.velocity_z;
@@ -246,12 +247,9 @@ fn main() -> std::io::Result<()> {
                 socket.send_to(&encoded_game_update, client_addr)?;
             }
 
-            if game_state.sprites.len() != previous_sprites_len {
-                previous_sprites_len = game_state.sprites.len();
-
+            if sprites_changed {
                 let encoded_sprite_update =
                     bincode::serialize(&ServerMessage::SpriteUpdate(game_state.sprites.clone())).unwrap();
-
                 for client_addr in clients.keys() {
                     socket.send_to(&encoded_sprite_update, client_addr)?;
                 }

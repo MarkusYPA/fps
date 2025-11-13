@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, f32::MAX, time::Duration};
 
 use crate::consts::{
-    CAMERA_HEIGHT_OFFSET, SHOT_MAX_DISTANCE,
-    SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
+    CAMERA_HEIGHT_OFFSET, PUDDLE_TIMEOUT, SHOT_MAX_DISTANCE, SPRITE_OTHER_PLAYER_HEIGHT,
+    SPRITE_OTHER_PLAYER_WIDTH,
 };
 
 pub mod consts;
@@ -29,7 +29,7 @@ pub enum ClientMessage {
 pub enum ServerMessage {
     Welcome(Welcome),
     GameUpdate(HashMap<String, PlayerUpdate>),
-    SpriteUpdate(Vec<Sprite>),
+    SpriteUpdate(HashMap<u32, Sprite>),
     InitialState(GameState),
     UsernameRejected(String),
     PlayerLeft(u64),
@@ -110,7 +110,10 @@ pub struct Sprite {
 pub struct GameState {
     pub players: HashMap<String, Player>,
     pub world: World,
-    pub sprites: Vec<Sprite>,
+    //pub sprites: Vec<Sprite>,
+    sprite_id: u32,
+    pub sprites: HashMap<u32, Sprite>,
+    pub sprite_timeouts: HashMap<u32, Duration>,
 }
 
 impl GameState {
@@ -124,7 +127,10 @@ impl GameState {
         GameState {
             players: HashMap::new(),
             world,
-            sprites: Vec::new(),
+            //sprites: Vec::new(),
+            sprite_id: 0,
+            sprites: HashMap::new(),
+            sprite_timeouts: HashMap::new(),
         }
     }
 
@@ -137,7 +143,10 @@ impl GameState {
             width: 0.3,
             height: 0.075,
         };
-        self.sprites.push(puddle);
+        //self.sprites.push(puddle);
+        self.sprites.insert(self.sprite_id, puddle);
+        self.sprite_timeouts.insert(self.sprite_id, PUDDLE_TIMEOUT);
+        self.sprite_id += 1;
     }
 
     pub fn update(&mut self, id: String, input: &Input, dt: Duration) {
@@ -317,5 +326,28 @@ impl GameState {
         };
 
         distance * distance
+    }
+
+    pub fn check_sprites(&mut self, dt: Duration) -> bool {
+        let mut to_remove = Vec::new();
+        let mut changed = false;
+
+        // Iterate mutably but don't remove yet
+        for (id, dur) in self.sprite_timeouts.iter_mut() {
+            *dur = dur.saturating_sub(dt);
+
+            if dur.is_zero() {
+                to_remove.push(*id);
+                changed = true;
+            }
+        }
+
+        // Now remove outside the borrow
+        for id in to_remove {
+            self.sprites.remove(&id);
+            self.sprite_timeouts.remove(&id);
+        }
+
+        changed
     }
 }

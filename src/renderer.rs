@@ -268,7 +268,7 @@ impl Renderer {
             let mut sprite_infos: Vec<SpriteInfo> = game_state
                 .sprites
                 .iter()
-                .map(|s| {
+                .map(|(_, s)| {
                     let sprite_x = s.x - player.x;
                     let sprite_y = s.y - player.y;
                     SpriteInfo {
