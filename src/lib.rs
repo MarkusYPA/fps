@@ -163,13 +163,13 @@ impl GameState {
                 player.death_timer = player.death_timer.saturating_sub(dt);
                 if player.death_timer < RESPAWN_DELAY {
                     player.dying = false;
+                    puddle_coordiantes = (player.x, player.y);
                 }
             } else if player.health == 0 {
                 player.animation_state = AnimationState::Dead;
                 player.death_timer = player.death_timer.saturating_sub(dt);
                 if player.death_timer.is_zero() {
-                    if let Some((map_x, map_y)) = respawn_pos {            
-                        puddle_coordiantes = (player.x, player.y);
+                    if let Some((map_x, map_y)) = respawn_pos {
                         player.respawn(map_x, map_y);
                     }
                 }
