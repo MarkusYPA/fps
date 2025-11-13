@@ -425,7 +425,7 @@ fn main() -> Result<()> {
                             }
                             ServerMessage::SpriteUpdate(new_sprites) => {
                                 if let Some(ref mut gs) = game_state {
-                                    gs.sprites = new_sprites;
+                                    gs.floor_sprites = new_sprites;
                                 }
                             }
                             ServerMessage::PlayerLeft(id) => {

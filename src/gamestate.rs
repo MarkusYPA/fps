@@ -14,10 +14,9 @@ use std::{collections::HashMap, f32::MAX, time::Duration};
 pub struct GameState {
     pub players: HashMap<String, Player>,
     pub world: World,
-    //pub sprites: Vec<Sprite>,
-    sprite_id: u32,
-    pub sprites: HashMap<u32, Sprite>,
-    pub sprite_timeouts: HashMap<u32, Duration>,
+    floor_sprite_id: u32,
+    pub floor_sprites: HashMap<u32, Sprite>,
+    pub floor_sprite_timeouts: HashMap<u32, Duration>,
 }
 
 impl GameState {
@@ -31,10 +30,9 @@ impl GameState {
         GameState {
             players: HashMap::new(),
             world,
-            //sprites: Vec::new(),
-            sprite_id: 0,
-            sprites: HashMap::new(),
-            sprite_timeouts: HashMap::new(),
+            floor_sprite_id: 0,
+            floor_sprites: HashMap::new(),
+            floor_sprite_timeouts: HashMap::new(),
         }
     }
 
@@ -48,9 +46,9 @@ impl GameState {
             height: 0.075,
         };
         //self.sprites.push(puddle);
-        self.sprites.insert(self.sprite_id, puddle);
-        self.sprite_timeouts.insert(self.sprite_id, PUDDLE_TIMEOUT);
-        self.sprite_id += 1;
+        self.floor_sprites.insert(self.floor_sprite_id, puddle);
+        self.floor_sprite_timeouts.insert(self.floor_sprite_id, PUDDLE_TIMEOUT);
+        self.floor_sprite_id += 1;
 
         println!("sprite inserted");
     }
@@ -60,7 +58,7 @@ impl GameState {
         let mut changed = false;
 
         // Iterate mutably but don't remove yet
-        for (id, dur) in self.sprite_timeouts.iter_mut() {
+        for (id, dur) in self.floor_sprite_timeouts.iter_mut() {
             *dur = dur.saturating_sub(dt);
 
             if dur.is_zero() {
@@ -71,8 +69,8 @@ impl GameState {
 
         // Now remove outside the borrow
         for id in to_remove {
-            self.sprites.remove(&id);
-            self.sprite_timeouts.remove(&id);
+            self.floor_sprites.remove(&id);
+            self.floor_sprite_timeouts.remove(&id);
             println!("sprite removed");
         }
 

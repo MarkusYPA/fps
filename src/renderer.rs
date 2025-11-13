@@ -264,9 +264,9 @@ impl Renderer {
                 }
             }
 
-            // sprites from world
+            // floor sprites (puddles) from world
             let mut sprite_infos: Vec<SpriteInfo> = game_state
-                .sprites
+                .floor_sprites
                 .iter()
                 .map(|(_, s)| {
                     let sprite_x = s.x - player.x;
@@ -324,7 +324,7 @@ impl Renderer {
                 }
             }
 
-            // Sort world sprites (puddles) by distance
+            // Sort floor sprites (puddles) by distance
             sprite_infos.sort_by(|a, b| {
                 b.dist_sq
                     .partial_cmp(&a.dist_sq)
