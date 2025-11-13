@@ -50,4 +50,4 @@ pub const CROSSHAIR_SCALE: f32 = 0.5;
 pub const SHOT_TIME: Duration = Duration::from_millis(35);
 pub const SHOT_MAX_DISTANCE: f32 = 200.0;
 
-pub const PUDDLE_TIMEOUT: Duration = Duration::from_secs(10);
+pub const PUDDLE_TIMEOUT: Duration = Duration::from_secs(120);

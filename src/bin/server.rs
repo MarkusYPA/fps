@@ -202,13 +202,19 @@ fn main() -> std::io::Result<()> {
         if now - last_tick >= tick_duration {
             last_tick = now;
 
+            let mut sprites_changed = false;
+
             // Apply inputs and update game state
             for (id, input) in &client_inputs {
-                game_state.update(id.to_string(), input, tick_duration);
+                if game_state.update(id.to_string(), input, tick_duration) {
+                    sprites_changed = true
+                }
             }
 
             // remove puddles if they hit timeout
-            let sprites_changed = game_state.check_sprites(tick_duration);
+            if game_state.check_sprites(tick_duration) {
+                sprites_changed = true;
+            }
 
             // Adjust players' z if jumped
             for player in game_state.players.values_mut() {

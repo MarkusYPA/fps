@@ -147,9 +147,35 @@ impl GameState {
         self.sprites.insert(self.sprite_id, puddle);
         self.sprite_timeouts.insert(self.sprite_id, PUDDLE_TIMEOUT);
         self.sprite_id += 1;
+
+        println!("sprite inserted");
     }
 
-    pub fn update(&mut self, id: String, input: &Input, dt: Duration) {
+    pub fn check_sprites(&mut self, dt: Duration) -> bool {
+        let mut to_remove = Vec::new();
+        let mut changed = false;
+
+        // Iterate mutably but don't remove yet
+        for (id, dur) in self.sprite_timeouts.iter_mut() {
+            *dur = dur.saturating_sub(dt);
+
+            if dur.is_zero() {
+                to_remove.push(*id);
+                changed = true;
+            }
+        }
+
+        // Now remove outside the borrow
+        for id in to_remove {
+            self.sprites.remove(&id);
+            self.sprite_timeouts.remove(&id);
+            println!("sprite removed");
+        }
+
+        changed
+    }
+
+    pub fn update(&mut self, id: String, input: &Input, dt: Duration) -> bool {
         // generate respawn position before mutable borrow
         let respawn_pos = if self
             .players
@@ -197,7 +223,10 @@ impl GameState {
 
         if puddle_coordiantes.0 != 0.0 {
             self.add_puddle(puddle_coordiantes.0, puddle_coordiantes.1);
+            return true;
         }
+
+        false
     }
 
     pub fn measure_shot(&self, shooter_id: &u64) -> Option<u64> {
@@ -326,28 +355,5 @@ impl GameState {
         };
 
         distance * distance
-    }
-
-    pub fn check_sprites(&mut self, dt: Duration) -> bool {
-        let mut to_remove = Vec::new();
-        let mut changed = false;
-
-        // Iterate mutably but don't remove yet
-        for (id, dur) in self.sprite_timeouts.iter_mut() {
-            *dur = dur.saturating_sub(dt);
-
-            if dur.is_zero() {
-                to_remove.push(*id);
-                changed = true;
-            }
-        }
-
-        // Now remove outside the borrow
-        for id in to_remove {
-            self.sprites.remove(&id);
-            self.sprite_timeouts.remove(&id);
-        }
-
-        changed
     }
 }
