@@ -8,46 +8,44 @@ use crate::{
 };
 
 impl Renderer {
-    // ===== Minimap Helper Functions =====
+    /* ---------------------------------------------------------
+     * Helper: fill a rectangle
+     * --------------------------------------------------------- */
+    fn fill_rect(&mut self, x: usize, y: usize, w: usize, h: usize, color: u32) {
+        for row in y..y + h {
+            if row >= HEIGHT { break; }
 
-    /// Fill a rectangle with a color
-    fn fill_rect(&mut self, x: usize, y: usize, width: usize, height: usize, color: u32) {
-        for row in 0..height {
-            let py = y + row;
-            if py >= HEIGHT {
-                break;
-            }
-            for col in 0..width {
-                let px = x + col;
-                if px >= WIDTH {
-                    break;
-                }
-                self.buffer[py * WIDTH + px] = color;
-            }
+            let start = row * WIDTH + x;
+            let end   = start + w.min(WIDTH - x);
+            self.buffer[start..end].fill(color);
         }
     }
 
-    /// Draw a filled circle
+    /* ---------------------------------------------------------
+     * Helper: draw filled circle
+     * --------------------------------------------------------- */
     fn draw_circle(&mut self, cx: usize, cy: usize, radius: usize, color: u32) {
-        let r2 = (radius * radius) as i32;
-        for y in 0..=(2 * radius) {
-            for x in 0..=(2 * radius) {
-                let dx = x as i32 - radius as i32;
-                let dy = y as i32 - radius as i32;
-                if dx * dx + dy * dy <= r2 {
-                    let px = (cx as i32 + dx) as usize;
-                    let py = (cy as i32 + dy) as usize;
-                    if px < WIDTH && py < HEIGHT {
-                        self.buffer[py * WIDTH + px] = color;
-                    }
+    let r = radius as i32;
+    let r2 = r * r;
+
+    for y in -r..=r {
+        for x in -r..=r {
+            if x * x + y * y <= r2 {
+                let px = cx as i32 + x;
+                let py = cy as i32 + y;
+
+                if px >= 0 && py >= 0 && px < WIDTH as i32 && py < HEIGHT as i32 {
+                    self.buffer[py as usize * WIDTH + px as usize] = color;
                 }
             }
         }
     }
+}
 
-    // Draw a line between two points (simple Bresenham-ish approach)
+    /* ---------------------------------------------------------
+     * Helper: Bresenham line
+     * --------------------------------------------------------- */
     pub fn draw_line(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, color: u32) {
-        // Bresenham's line algorithm with i32 coords and clipping checks.
         let dx = (x1 - x0).abs();
         let dy = (y1 - y0).abs();
         let sx = if x1 > x0 { 1 } else { -1 };
@@ -56,153 +54,115 @@ impl Renderer {
         let mut x = x0;
         let mut y = y0;
 
-        // Safety limit to prevent infinite loops in degenerate cases
-        let max_steps = (dx as i64 + dy as i64 + 1) as usize + 100;
-        let mut step_count = 0usize;
+        let max_steps = (dx as usize + dy as usize + 1) + 100;
+        let mut steps = 0;
 
         loop {
-            if step_count > max_steps {
-                break;
-            }
-            step_count += 1;
+            if steps > max_steps { break; }
+            steps += 1;
 
-            if x >= 0 && x < WIDTH as i32 && y >= 0 && y < HEIGHT as i32 {
+            if x >= 0 && y >= 0 && x < WIDTH as i32 && y < HEIGHT as i32 {
                 self.buffer[y as usize * WIDTH + x as usize] = color;
             }
 
-            if x == x1 && y == y1 {
-                break;
-            }
+            if x == x1 && y == y1 { break; }
 
             let e2 = err * 2;
-            if e2 > -dy {
-                err -= dy;
-                x += sx;
-            }
-            if e2 < dx {
-                err += dx;
-                y += sy;
-            }
+            if e2 > -dy { err -= dy; x += sx; }
+            if e2 <  dx { err += dx; y += sy; }
         }
     }
 
-    /// Render the minimap in the top-right corner
-    pub fn render_minimap(&mut self, game_state: &GameState, my_id: u64) {
-        let minimap_width = MINIMAP_WIDTH;
-        let minimap_height = MINIMAP_HEIGHT;
-        let start_x = WIDTH - minimap_width - MINIMAP_MARGIN;
-        let start_y = MINIMAP_MARGIN;
+    /* ---------------------------------------------------------
+     * Helper: minimap grid
+     * --------------------------------------------------------- */
+    fn draw_grid_cell(&mut self, px: usize, py: usize, size: usize, color: u32) {
+        self.draw_line(px as i32, py as i32, (px + size) as i32, py as i32, color);
+        self.draw_line(px as i32, py as i32, px as i32, (py + size) as i32, color);
+    }
 
-        // Get actual map dimensions
-        let map_width = game_state.world.map.len();
-        let map_height = if map_width > 0 {
-            game_state.world.map[0].len()
-        } else {
-            1
-        };
+    /* ---------------------------------------------------------
+     * Main: minimap
+     * --------------------------------------------------------- */
+    pub fn render_minimap(&mut self, game: &GameState, my_id: u64) {
+        let w = MINIMAP_WIDTH;
+        let h = MINIMAP_HEIGHT;
+        let x0 = WIDTH - w - MINIMAP_MARGIN;
+        let y0 = MINIMAP_MARGIN;
 
-        // Calculate tile size based on actual map dimensions
-        let tile_size = minimap_width / map_width.max(1);
+        /* Background */
+        self.fill_rect(x0, y0, w, h, MINIMAP_BACKGROUND_COLOR);
 
-        // Draw background (border and background fill)
-        self.fill_rect(
-            start_x,
-            start_y,
-            minimap_width,
-            minimap_height,
-            MINIMAP_BACKGROUND_COLOR,
-        );
+        /* Map info */
+        let map_w = game.world.map.len().max(1);
+        let map_h = game.world.map.get(0).map_or(1, |row| row.len());
+        let tile  = w / map_w;
 
-        // Draw world tiles
-        for y in 0..map_height {
-            for x in 0..map_width {
-                let px = start_x + x * tile_size;
-                let py = start_y + y * tile_size;
-                let tile = game_state.world.get_tile(x, y);
-                let tile_color = if tile > 0 {
+        /* Tiles + grid */
+        for y in 0..map_h {
+            for x in 0..map_w {
+                let px = x0 + x * tile;
+                let py = y0 + y * tile;
+
+                let tile_color = if game.world.get_tile(x, y) > 0 {
                     MINIMAP_WALL_COLOR
                 } else {
                     MINIMAP_OPEN_SPACE_COLOR
                 };
-                self.fill_rect(px, py, tile_size, tile_size, tile_color);
 
-                // Draw grid lines
-                self.draw_line(
-                    px as i32,
-                    py as i32,
-                    (px + tile_size) as i32,
-                    py as i32,
-                    MINIMAP_GRID_COLOR,
-                );
-                self.draw_line(
-                    px as i32,
-                    py as i32,
-                    px as i32,
-                    (py + tile_size) as i32,
-                    MINIMAP_GRID_COLOR,
-                );
+                self.fill_rect(px, py, tile, tile, tile_color);
+                self.draw_grid_cell(px, py, tile, MINIMAP_GRID_COLOR);
             }
         }
 
-        // Draw all other players as dots
-        for (id, player) in &game_state.players {
+        /* Other players */
+        for (id, p) in &game.players {
             if id != &my_id.to_string() {
-                let px = start_x + (player.x * tile_size as f32) as usize;
-                let py = start_y + (player.y * tile_size as f32) as usize;
-                self.draw_circle(
-                    px,
-                    py,
-                    MINIMAP_PLAYER_DOT_RADIUS,
-                    MINIMAP_OTHER_PLAYER_COLOR,
-                );
+                let px = x0 + (p.x * tile as f32) as usize;
+                let py = y0 + (p.y * tile as f32) as usize;
+
+                self.draw_circle(px, py, MINIMAP_PLAYER_DOT_RADIUS, MINIMAP_OTHER_PLAYER_COLOR);
             }
         }
 
-        // Draw own player's indicator using a navigator PNG
-        if let Some(player) = game_state.players.get(&my_id.to_string()) {
+        /* Own player icon */
+        if let Some(p) = game.players.get(&my_id.to_string()) {
             if let Some(tex) = self.texture_manager.get_texture("navigator") {
-                let icon_size = MINIMAP_PLAYER_ICON_SIZE;
-                let (icon_w, icon_h) = (icon_size as i32, icon_size as i32);
-                let (half_w, half_h) = (icon_w / 2, icon_h / 2);
+                let size = MINIMAP_PLAYER_ICON_SIZE as i32;
+                let (hw, hh) = (size / 2, size / 2);
 
-                let center_px = start_x as f32 + player.x * tile_size as f32;
-                let center_py = start_y as f32 + player.y * tile_size as f32;
+                let cx = x0 as f32 + p.x * tile as f32;
+                let cy = y0 as f32 + p.y * tile as f32;
 
                 let tex_cx = tex.width as f32 * 0.5;
                 let tex_cy = tex.height as f32 * 0.5;
-                let scale_x = tex.width as f32 / icon_size;
-                let scale_y = tex.height as f32 / icon_size;
 
-                // simplified rotation formula (equivalent to +PI/2)
-                let angle = player.angle + std::f32::consts::FRAC_PI_2;
+                let sx = tex.width as f32 / size as f32;
+                let sy = tex.height as f32 / size as f32;
+
+                let angle = p.angle + std::f32::consts::FRAC_PI_2;
                 let (sin_a, cos_a) = angle.sin_cos();
 
-                for dy in -half_h..half_h {
-                    let dst_y = center_py as i32 + dy;
-                    if dst_y < start_y as i32 || dst_y >= (start_y + minimap_height) as i32 {
-                        continue;
-                    }
+                for dy in -hh..hh {
+                    let dst_y = cy as i32 + dy;
+                    if dst_y < y0 as i32 || dst_y >= (y0 + h) as i32 { continue; }
 
-                    for dx in -half_w..half_w {
-                        let dst_x = center_px as i32 + dx;
-                        if dst_x < start_x as i32 || dst_x >= (start_x + minimap_width) as i32 {
-                            continue;
-                        }
+                    for dx in -hw..hw {
+                        let dst_x = cx as i32 + dx;
+                        if dst_x < x0 as i32 || dst_x >= (x0 + w) as i32 { continue; }
 
-                        // Rotate and scale
-                        let src_x = ((dx as f32) * scale_x) * cos_a
-                            + ((dy as f32) * scale_y) * sin_a
-                            + tex_cx;
-                        let src_y = -((dx as f32) * scale_x) * sin_a
-                            + ((dy as f32) * scale_y) * cos_a
-                            + tex_cy;
+                        let src_x =  dx as f32 * sx * cos_a + dy as f32 * sy * sin_a + tex_cx;
+                        let src_y = -dx as f32 * sx * sin_a + dy as f32 * sy * cos_a + tex_cy;
 
-                        let sx = src_x as i32;
-                        let sy = src_y as i32;
+                        let sx_i = src_x as i32;
+                        let sy_i = src_y as i32;
 
-                        if sx >= 0 && sy >= 0 && (sx as u32) < tex.width && (sy as u32) < tex.height
+                        if sx_i >= 0 && sy_i >= 0
+                            && (sx_i as u32) < tex.width
+                            && (sy_i as u32) < tex.height
                         {
-                            let color = tex.pixels[(sy as u32 * tex.width + sx as u32) as usize];
+                            let color = tex.pixels[(sy_i as u32 * tex.width + sx_i as u32) as usize];
+
                             if (color >> 24) & 0xFF > 0 {
                                 self.buffer[dst_y as usize * WIDTH + dst_x as usize] = color;
                             }
@@ -212,34 +172,13 @@ impl Renderer {
             }
         }
 
-        // Draw minimap border
-        self.draw_line(
-            start_x as i32,
-            start_y as i32,
-            (start_x + minimap_width) as i32,
-            start_y as i32,
-            MINIMAP_BORDER_COLOR,
-        );
-        self.draw_line(
-            (start_x + minimap_width) as i32,
-            start_y as i32,
-            (start_x + minimap_width) as i32,
-            (start_y + minimap_height) as i32,
-            MINIMAP_BORDER_COLOR,
-        );
-        self.draw_line(
-            (start_x + minimap_width) as i32,
-            (start_y + minimap_height) as i32,
-            start_x as i32,
-            (start_y + minimap_height) as i32,
-            MINIMAP_BORDER_COLOR,
-        );
-        self.draw_line(
-            start_x as i32,
-            (start_y + minimap_height) as i32,
-            start_x as i32,
-            start_y as i32,
-            MINIMAP_BORDER_COLOR,
-        );
+        /* Border */
+        let ex = x0 + w;
+        let ey = y0 + h;
+
+        self.draw_line(x0 as i32, y0 as i32, ex as i32, y0 as i32, MINIMAP_BORDER_COLOR); // top
+        self.draw_line(ex as i32,  y0 as i32, ex as i32, ey as i32, MINIMAP_BORDER_COLOR); // right
+        self.draw_line(ex as i32,  ey as i32, x0 as i32, ey as i32, MINIMAP_BORDER_COLOR); // bottom
+        self.draw_line(x0 as i32,  ey as i32, x0 as i32, y0 as i32, MINIMAP_BORDER_COLOR); // left
     }
 }
