@@ -17,7 +17,7 @@ use winit_input_helper::WinitInputHelper;
 
 use fps::{
     AnimationState::{Dying, Walking},
-    ClientMessage, GameState, Input, ServerMessage,
+    ClientMessage, gamestate::GameState, Input, ServerMessage,
     consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WALK_FRAME_TIME, WIDTH},
     player::Player,
     renderer::Renderer,
@@ -421,6 +421,11 @@ fn main() -> Result<()> {
                                             gs.players.insert(id.clone(), p);
                                         }
                                     }
+                                }
+                            }
+                            ServerMessage::SpriteUpdate(new_sprites) => {
+                                if let Some(ref mut gs) = game_state {
+                                    gs.floor_sprites = new_sprites;
                                 }
                             }
                             ServerMessage::PlayerLeft(id) => {

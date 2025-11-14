@@ -1,6 +1,6 @@
 use fps::{
-    ClientMessage, GameState, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
-    player::Player,
+    ClientMessage, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
+    player::Player, gamestate::GameState,
 };
 use local_ip_address::local_ip;
 use rand::prelude::*;
@@ -123,7 +123,6 @@ fn main() -> std::io::Result<()> {
                         ClientMessage::Shot => {
                             if let Some((shooter_id, shooter_name, _)) = clients.get(&src) {
                                 if let Some(target_id) = game_state.measure_shot(shooter_id) {
-
                                     // reduce target hp
                                     if let Some(target) =
                                         game_state.players.get_mut(&target_id.to_string())
@@ -138,8 +137,6 @@ fn main() -> std::io::Result<()> {
                                         .unwrap()
                                         .1
                                         .clone();
-
-                                    println!("{} shot {}", shooter_name, target_name);
 
                                     let hit = fps::Hit {
                                         shooter_id: *shooter_id,
@@ -205,9 +202,18 @@ fn main() -> std::io::Result<()> {
         if now - last_tick >= tick_duration {
             last_tick = now;
 
+            let mut sprites_changed = false;
+
             // Apply inputs and update game state
             for (id, input) in &client_inputs {
-                game_state.update(id.to_string(), input, tick_duration);
+                if game_state.update(id.to_string(), input, tick_duration) {
+                    sprites_changed = true
+                }
+            }
+
+            // remove puddles if they hit timeout
+            if game_state.limit_sprites() {
+                sprites_changed = true;
             }
 
             // Adjust players' z if jumped
@@ -242,8 +248,17 @@ fn main() -> std::io::Result<()> {
 
             let encoded_game_update =
                 bincode::serialize(&ServerMessage::GameUpdate(player_updates)).unwrap();
+
             for client_addr in clients.keys() {
                 socket.send_to(&encoded_game_update, client_addr)?;
+            }
+
+            if sprites_changed {
+                let encoded_sprite_update =
+                    bincode::serialize(&ServerMessage::SpriteUpdate(game_state.floor_sprites.clone())).unwrap();
+                for client_addr in clients.keys() {
+                    socket.send_to(&encoded_sprite_update, client_addr)?;
+                }
             }
         }
 
