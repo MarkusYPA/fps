@@ -481,14 +481,44 @@ impl<'a> Renderer<'a> {
 
     pub fn display_health(&self, game_state: &GameState, my_id: u64, frame: &mut [u8]) {
         if let Some(player) = game_state.players.get(&my_id.to_string()) {
+            // Draw a semi-transparent black rectangle behind the health text
+            let rect_x = 100;
+            let rect_y = HEIGHT - 55;
+            let rect_w = 150;
+            let rect_h = 40;
+            let color = [0, 0, 0, 128]; // semi-transparent black
+
+            for y in rect_y..(rect_y + rect_h) {
+                for x in rect_x..(rect_x + rect_w) {
+                    if x < WIDTH && y < HEIGHT {
+                        let idx = (y * WIDTH + x) * 4;
+                        if idx + 3 < frame.len() {
+                            let bg_r = frame[idx];
+                            let bg_g = frame[idx + 1];
+                            let bg_b = frame[idx + 2];
+
+                            let alpha = color[3] as u16;
+                            let r = (color[0] as u16 * alpha + bg_r as u16 * (255 - alpha)) / 255;
+                            let g = (color[1] as u16 * alpha + bg_g as u16 * (255 - alpha)) / 255;
+                            let b = (color[2] as u16 * alpha + bg_b as u16 * (255 - alpha)) / 255;
+
+                            frame[idx] = r as u8;
+                            frame[idx + 1] = g as u8;
+                            frame[idx + 2] = b as u8;
+                            frame[idx + 3] = 255;
+                        }
+                    }
+                }
+            }
+
             draw_text(
                 frame,
                 &self.font,
-                "HEALTH",
+                "Health",
                 30.0,
-                WIDTH / 2 - 85,
+                110,
                 HEIGHT - 50,
-                [255, 255, 255, 255],
+                [220, 210, 200, 255],
             );
 
             draw_text(
@@ -496,7 +526,7 @@ impl<'a> Renderer<'a> {
                 &self.font,
                 &player.health.to_string(),
                 30.0,
-                WIDTH / 2,
+                200,
                 HEIGHT - 50,
                 [255, 255, 255, 255],
             );
