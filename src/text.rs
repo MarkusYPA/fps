@@ -5,11 +5,12 @@ pub fn draw_text(
     frame: &mut [u8],
     font: &Font,
     text: &str,
+    size: f32,
     x: usize,
     y: usize,
     color: [u8; 4],
 ) {
-    let scale = Scale::uniform(24.0);
+    let scale = Scale::uniform(size);
     let v_metrics = font.v_metrics(scale);
     let layout = font.layout(text, scale, point(x as f32, y as f32 + v_metrics.ascent));
 

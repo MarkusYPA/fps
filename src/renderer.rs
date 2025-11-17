@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use crate::consts::FONT_PATH;
+use crate::text::draw_text;
 use crate::textures::{self};
 use crate::{
     AnimationState::{Dead, Dying, Idle, Shooting, Walking},
@@ -13,6 +15,7 @@ use crate::{
     spritesheet::SpriteSheet,
     textures::TextureManager,
 };
+use rusttype::Font;
 
 fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
     let angle_diff = ((player_angle - camera_angle).to_degrees() + 180.0).rem_euclid(360.0);
@@ -31,7 +34,7 @@ fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
     }
 }
 
-pub struct Renderer {
+pub struct Renderer<'a> {
     pub buffer: Vec<u32>,
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
@@ -40,6 +43,7 @@ pub struct Renderer {
     hit_marker_start: Option<Instant>,
     hit_marker_color: u32,
     hit_marker_duration: Duration,
+    font: Font<'a>,
 }
 
 struct SpriteInfo<'a> {
@@ -53,11 +57,14 @@ struct SpriteInfo<'a> {
     frame: Option<&'a textures::Texture>,
 }
 
-impl Renderer {
+impl<'a> Renderer<'a> {
     pub fn new(
         texture_manager: TextureManager,
         sprite_sheets: HashMap<String, SpriteSheet>,
     ) -> Self {
+        let font_data = std::fs::read(FONT_PATH).unwrap();
+        let font = Font::try_from_vec(font_data).unwrap();
+
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT],
             z_buffer: vec![0.0; WIDTH],
@@ -66,6 +73,7 @@ impl Renderer {
             hit_marker_start: None,
             hit_marker_color: 0x00FFFFFF,
             hit_marker_duration: Duration::from_millis(400),
+            font,
         }
     }
 
@@ -468,6 +476,30 @@ impl Renderer {
             let color = self.buffer[i];
             let rgba = [(color >> 16) as u8, (color >> 8) as u8, color as u8, 0xFF];
             pixel.copy_from_slice(&rgba);
+        }
+    }
+
+    pub fn display_health(&self, game_state: &GameState, my_id: u64, frame: &mut [u8]) {
+        if let Some(player) = game_state.players.get(&my_id.to_string()) {
+            draw_text(
+                frame,
+                &self.font,
+                "HEALTH",
+                30.0,
+                WIDTH / 2 - 85,
+                HEIGHT - 50,
+                [255, 255, 255, 255],
+            );
+
+            draw_text(
+                frame,
+                &self.font,
+                &player.health.to_string(),
+                30.0,
+                WIDTH / 2,
+                HEIGHT - 50,
+                [255, 255, 255, 255],
+            );
         }
     }
 }

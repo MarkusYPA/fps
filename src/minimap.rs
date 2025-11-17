@@ -7,7 +7,7 @@ use crate::{
     consts::MINIMAP_WALL_COLOR, consts::MINIMAP_WIDTH, consts::WIDTH,
 };
 
-impl Renderer {
+impl<'a> Renderer<'a> {
     // ===== Minimap Helper Functions =====
 
     /// Fill a rectangle with a color
