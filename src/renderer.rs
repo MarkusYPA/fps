@@ -272,11 +272,11 @@ impl<'a> Renderer<'a> {
                 }
             }
 
-            // sprites from world
+            // floor sprites (puddles) from world
             let mut sprite_infos: Vec<SpriteInfo> = game_state
-                .sprites
+                .floor_sprites
                 .iter()
-                .map(|s| {
+                .map(|(_, s)| {
                     let sprite_x = s.x - player.x;
                     let sprite_y = s.y - player.y;
                     SpriteInfo {
@@ -293,6 +293,7 @@ impl<'a> Renderer<'a> {
                 .collect();
 
             // sprites from other players
+            let mut player_sprites = Vec::new();
             for (id, other_player) in &game_state.players {
                 if id != &my_id.to_string() {
                     let direction = get_direction(other_player.angle, player.angle);
@@ -318,7 +319,7 @@ impl<'a> Renderer<'a> {
 
                     let sprite_x = other_player.x - player.x;
                     let sprite_y = other_player.y - player.y;
-                    sprite_infos.push(SpriteInfo {
+                    player_sprites.push(SpriteInfo {
                         x: other_player.x,
                         y: other_player.y,
                         z: other_player.z,
@@ -331,12 +332,22 @@ impl<'a> Renderer<'a> {
                 }
             }
 
-            // Sort sprites by distance
+            // Sort floor sprites (puddles) by distance
             sprite_infos.sort_by(|a, b| {
                 b.dist_sq
                     .partial_cmp(&a.dist_sq)
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
+
+            // Sort player sprites by distance
+            player_sprites.sort_by(|a, b| {
+                b.dist_sq
+                    .partial_cmp(&a.dist_sq)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            // Combine sprite vectors so puddles are always behind players
+            sprite_infos.append(&mut player_sprites);
 
             // sprites to buffer
             for sprite_info in sprite_infos {
