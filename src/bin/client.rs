@@ -16,6 +16,7 @@ use winit::window::{CursorGrabMode, Window, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
+    text::draw_text,
     AnimationState::{Dying, Walking},
     ClientMessage, GameState, Input, ServerMessage,
     consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WALK_FRAME_TIME, WIDTH},
@@ -24,6 +25,7 @@ use fps::{
     spritesheet::hue_variations,
     textures::TextureManager,
 };
+use rusttype::Font;
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 struct Config {
@@ -234,6 +236,10 @@ fn main() -> Result<()> {
     let mut renderer = Renderer::new(texture_manager, spritesheets);
     let mut game_state: Option<GameState> = None;
 
+    let font_data = std::fs::read("assets/VT323-Regular.ttf")?;
+    let font = Font::try_from_vec(font_data).unwrap();
+
+
     let mut frame_count = 0;
     let mut fps_timer = Instant::now();
     let window_clone = window.clone();
@@ -293,19 +299,23 @@ fn main() -> Result<()> {
                     if let Some(ref gs) = game_state {
                         renderer.render(gs, my_id);
                         renderer.draw_to_buffer(pixels.frame_mut());
+
+                        frame_count += 1;
+                        if fps_timer.elapsed() >= Duration::from_secs(1) {
+                            let fps = frame_count;
+                            frame_count = 0;
+                            fps_timer = Instant::now();
+                            window_clone.set_title(&format!("Blob Hunter 3-D - {} FPS", fps));
+
+                            let fps_text = format!("FPS: {}", fps);
+                            draw_text(pixels.frame_mut(), &font, &fps_text, 10, 10, [255, 255, 255, 255]);
+                        }
+
                         if let Err(err) = pixels.render() {
                             eprintln!("pixels.render() failed: {}", err);
                             elwt.exit();
                             return;
                         }
-                    }
-
-                    frame_count += 1;
-                    if fps_timer.elapsed() >= Duration::from_secs(1) {
-                        let fps = frame_count;
-                        frame_count = 0;
-                        fps_timer = Instant::now();
-                        window_clone.set_title(&format!("FPS Game - {} FPS", fps));
                     }
                 }
                 _ => (),
