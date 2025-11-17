@@ -16,13 +16,13 @@ use winit::window::{CursorGrabMode, Window, WindowBuilder};
 use winit_input_helper::WinitInputHelper;
 
 use fps::{
-    text::draw_text,
     AnimationState::{Dying, Walking},
     ClientMessage, GameState, Input, ServerMessage,
     consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WALK_FRAME_TIME, WIDTH},
     player::Player,
     renderer::Renderer,
     spritesheet::hue_variations,
+    text::draw_text,
     textures::TextureManager,
 };
 use rusttype::Font;
@@ -239,8 +239,8 @@ fn main() -> Result<()> {
     let font_data = std::fs::read("assets/VT323-Regular.ttf")?;
     let font = Font::try_from_vec(font_data).unwrap();
 
-
     let mut frame_count = 0;
+    let mut fps_text = String::new();
     let mut fps_timer = Instant::now();
     let window_clone = window.clone();
     let mut mouse_dx = 0.0;
@@ -307,9 +307,17 @@ fn main() -> Result<()> {
                             fps_timer = Instant::now();
                             window_clone.set_title(&format!("Blob Hunter 3-D - {} FPS", fps));
 
-                            let fps_text = format!("FPS: {}", fps);
-                            draw_text(pixels.frame_mut(), &font, &fps_text, 10, 10, [255, 255, 255, 255]);
+                            fps_text = format!("FPS: {}", fps);
                         }
+
+                        draw_text(
+                            pixels.frame_mut(),
+                            &font,
+                            &fps_text,
+                            10,
+                            10,
+                            [255, 255, 255, 255],
+                        );
 
                         if let Err(err) = pixels.render() {
                             eprintln!("pixels.render() failed: {}", err);
