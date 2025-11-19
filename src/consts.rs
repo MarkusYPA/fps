@@ -22,8 +22,8 @@ pub const PLAYER_PITCH_LIMIT: f32 = std::f32::consts::PI / 2.5;
 pub const PLAYER_SPRINT_SPEED_MULTIPLIER: f32 = 1.5;
 pub const PLAYER_RADIUS: f32 = 0.2;
 
-pub const MINIMAP_WIDTH: usize = 150;
-pub const MINIMAP_HEIGHT: usize = 150;
+pub const MINIMAP_WIDTH: usize = 160;
+pub const MINIMAP_HEIGHT: usize = 160;
 pub const MINIMAP_MARGIN: usize = 10;
 pub const MINIMAP_BACKGROUND_COLOR: u32 = 0x0011_1111;
 pub const MINIMAP_WALL_COLOR: u32 = 0x0044_4444;

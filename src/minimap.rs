@@ -65,7 +65,7 @@ impl Renderer {
                 break;
             }
             step_count += 1;
-
+            // Plot the pixel if within bounds
             if x >= 0 && x < WIDTH as i32 && y >= 0 && y < HEIGHT as i32 {
                 self.buffer[y as usize * WIDTH + x as usize] = color;
             }
@@ -73,7 +73,7 @@ impl Renderer {
             if x == x1 && y == y1 {
                 break;
             }
-
+            // Update error term and coordinates
             let e2 = err * 2;
             if e2 > -dy {
                 err -= dy;
