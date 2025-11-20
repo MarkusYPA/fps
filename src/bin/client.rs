@@ -277,6 +277,10 @@ fn main() -> Result<()> {
                         renderer.display_health(gs, my_id, pixels.frame_mut());
                         renderer.display_leaderboard(gs, pixels.frame_mut());
 
+                        if let Some(winner) = &gs.winner {
+                            renderer.display_winner(&winner, pixels.frame_mut());
+                        }
+
                         frame_count += 1;
                         if fps_timer.elapsed() >= Duration::from_secs(1) {
                             let fps = frame_count;
@@ -301,65 +305,66 @@ fn main() -> Result<()> {
             if input.key_pressed(KeyCode::Escape) || input.close_requested() {
                 elwt.exit();
                 return;
-            }
+            } else if game_state.as_ref().unwrap().winner.is_none() {
 
-            if input.key_pressed(KeyCode::Tab) {
-                cursor_grabbed = !cursor_grabbed;
-                window_clone.set_cursor_visible(!cursor_grabbed);
-                let grab_mode = if cursor_grabbed {
-                    CursorGrabMode::Confined
-                } else {
-                    CursorGrabMode::None
+                if input.key_pressed(KeyCode::Tab) {
+                    cursor_grabbed = !cursor_grabbed;
+                    window_clone.set_cursor_visible(!cursor_grabbed);
+                    let grab_mode = if cursor_grabbed {
+                        CursorGrabMode::Confined
+                    } else {
+                        CursorGrabMode::None
+                    };
+                    window_clone
+                        .set_cursor_grab(grab_mode)
+                        .or_else(|_e| {
+                            if cursor_grabbed {
+                                window_clone.set_cursor_grab(CursorGrabMode::Locked)
+                            } else {
+                                window_clone.set_cursor_grab(CursorGrabMode::None)
+                            }
+                        })
+                        .unwrap();
+                }
+
+                let mut turn = mouse_dx * MOUSE_SPEED;
+                if input.key_held(KeyCode::ArrowLeft) {
+                    turn -= 1.0;
+                }
+                if input.key_held(KeyCode::ArrowRight) {
+                    turn += 1.0;
+                }
+
+                if input.mouse_pressed(MouseButton::Left) {
+                    let shot_message = ClientMessage::Shot;
+                    let encoded_shot = bincode::serialize(&shot_message).unwrap();
+                    if let Err(e) = socket.send(&encoded_shot) {
+                        eprintln!("Error sending shot data: {}", e);
+                    }
+                }
+
+                let client_input = Input {
+                    forth: input.key_held(KeyCode::ArrowUp) || input.key_held(KeyCode::KeyW),
+                    back: input.key_held(KeyCode::ArrowDown) || input.key_held(KeyCode::KeyS),
+                    left: input.key_held(KeyCode::KeyA),
+                    right: input.key_held(KeyCode::KeyD),
+                    turn,
+                    pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
+                    jump: input.key_pressed(KeyCode::Space),
+                    sprint: input.key_held(KeyCode::ShiftLeft),
+                    shoot: input.mouse_pressed(MouseButton::Left),
                 };
-                window_clone
-                    .set_cursor_grab(grab_mode)
-                    .or_else(|_e| {
-                        if cursor_grabbed {
-                            window_clone.set_cursor_grab(CursorGrabMode::Locked)
-                        } else {
-                            window_clone.set_cursor_grab(CursorGrabMode::None)
-                        }
-                    })
-                    .unwrap();
-            }
+                mouse_dx = 0.0;
+                mouse_dy = 0.0;
 
-            let mut turn = mouse_dx * MOUSE_SPEED;
-            if input.key_held(KeyCode::ArrowLeft) {
-                turn -= 1.0;
-            }
-            if input.key_held(KeyCode::ArrowRight) {
-                turn += 1.0;
-            }
-
-            if input.mouse_pressed(MouseButton::Left) {
-                let shot_message = ClientMessage::Shot;
-                let encoded_shot = bincode::serialize(&shot_message).unwrap();
-                if let Err(e) = socket.send(&encoded_shot) {
-                    eprintln!("Error sending shot data: {}", e);
+                if Some(client_input.clone()) != prev_input {
+                    let encoded_input =
+                        bincode::serialize(&ClientMessage::Input(client_input.clone())).unwrap();
+                    if let Err(e) = socket.send(&encoded_input) {
+                        eprintln!("Error sending data: {}", e);
+                    }
+                    prev_input = Some(client_input.clone());
                 }
-            }
-
-            let client_input = Input {
-                forth: input.key_held(KeyCode::ArrowUp) || input.key_held(KeyCode::KeyW),
-                back: input.key_held(KeyCode::ArrowDown) || input.key_held(KeyCode::KeyS),
-                left: input.key_held(KeyCode::KeyA),
-                right: input.key_held(KeyCode::KeyD),
-                turn,
-                pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
-                jump: input.key_pressed(KeyCode::Space),
-                sprint: input.key_held(KeyCode::ShiftLeft),
-                shoot: input.mouse_pressed(MouseButton::Left),
-            };
-            mouse_dx = 0.0;
-            mouse_dy = 0.0;
-
-            if Some(client_input.clone()) != prev_input {
-                let encoded_input =
-                    bincode::serialize(&ClientMessage::Input(client_input.clone())).unwrap();
-                if let Err(e) = socket.send(&encoded_input) {
-                    eprintln!("Error sending data: {}", e);
-                }
-                prev_input = Some(client_input.clone());
             }
         }
 
@@ -431,6 +436,12 @@ fn main() -> Result<()> {
                                 if let Some(ref mut gs) = game_state {
                                     gs.leaderboard = leaderboard;
                                 }
+                            }
+                            ServerMessage::Winner(winner) => {
+                                if let Some(ref mut gs) = game_state {
+                                    gs.winner = Some(winner);
+                                }
+                                break;
                             }
                             _ => {}
                         }

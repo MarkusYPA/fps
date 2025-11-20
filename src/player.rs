@@ -186,7 +186,8 @@ impl Player {
         }
     }
 
-    pub fn take_damage(&mut self, damage: u16) {
+    /// Returns true if the player died due to that instance of damage
+    pub fn take_damage(&mut self, damage: u16) -> bool {
         if self.health > damage {
             self.health -= damage;
         } else if self.health > 0 {
@@ -195,9 +196,11 @@ impl Player {
             // Three frames, at 0,2 seconds. 3000 * 0.2 milliseconds = 0.6 seconds?
             self.death_timer =
                 Duration::from_millis((DIE_FRAME_TIME * 3000.0) as u64) + RESPAWN_DELAY;
+            return true;
         } else {
             self.health = 0;
         }
+        false
     }
 
     pub fn respawn(&mut self, map_x: f32, map_y: f32) {

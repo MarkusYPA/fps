@@ -652,6 +652,44 @@ impl<'a> Renderer<'a> {
             );
             text_y += row_height;
         }
-        println!("Current leaderboard: {:?}", game_state.leaderboard);
+    }
+
+    pub fn display_winner(&self, winner_name: &str, frame: &mut [u8]) {
+        let font_size = 150.0;
+        let text = format!("{} Won!", winner_name);
+
+        // Measure text to determine box size
+        let (text_width, text_height) = self.measure_text_bounds(&text, font_size);
+
+        // Add padding around the text (40 pixels on each side)
+        let padding = 40;
+        let rect_w = (text_width as usize) + padding * 2;
+        let rect_h = (text_height as usize) + padding * 2;
+
+        // Center the box on screen
+        let rect_x = (WIDTH - rect_w) / 2;
+        let rect_y = (HEIGHT - rect_h) / 2;
+        let color = [0, 0, 0, 200]; // semi-transparent black
+
+        Self::fill_rect(frame, rect_x, rect_y, rect_w, rect_h, color);
+
+        // Center text horizontally within the box
+        let text_x = rect_x + (rect_w as f32 / 2.0 - text_width / 2.0) as usize;
+
+        // Center text vertically
+        // draw_text uses (y + v_metrics.ascent) as the baseline
+        // To center the text, we position it so the visual center aligns with the box center
+        let box_center_y = rect_y as f32 + rect_h as f32 / 2.0;
+        let text_y = (box_center_y - text_height) as usize;
+
+        draw_text(
+            frame,
+            &self.font,
+            &text,
+            font_size,
+            text_x,
+            text_y,
+            [255, 215, 0, 255], // Gold color for winner text
+        );
     }
 }

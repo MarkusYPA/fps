@@ -1,6 +1,6 @@
 use fps::{
     ClientMessage, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags, gamestate::GameState,
-    player::Player,
+    player::Player, utils,
 };
 use local_ip_address::local_ip;
 use rand::prelude::*;
@@ -17,6 +17,7 @@ fn main() -> std::io::Result<()> {
 
     let my_local_ip = local_ip().unwrap();
     let socket = UdpSocket::bind(format!("{}:{}", my_local_ip, PORT))?;
+    socket.set_nonblocking(true)?;
     let map_display = match &parsed_flags.map {
         flags::MapIdentifier::Id(id) => id.to_string(),
         flags::MapIdentifier::Name(name) => name.clone(),
@@ -41,8 +42,6 @@ fn main() -> std::io::Result<()> {
     let tick_rate = 100; // ticks per second
     let tick_duration = Duration::from_secs(1) / tick_rate;
     let mut last_tick = Instant::now();
-
-    socket.set_nonblocking(true)?;
 
     loop {
         // Handle incoming messages
@@ -69,8 +68,7 @@ fn main() -> std::io::Result<()> {
                                     let rejection = ServerMessage::UsernameRejected(
                                         "Username already in use".to_string(),
                                     );
-                                    let encoded_rejection = bincode::serialize(&rejection).unwrap();
-                                    socket.send_to(&encoded_rejection, src)?;
+                                    utils::broadcast_message(rejection, &socket, None, Some(src))?;
                                 } else if username.is_empty() {
                                     println!(
                                         "Rejected connection from {} — username '{}' is empty.",
@@ -80,8 +78,7 @@ fn main() -> std::io::Result<()> {
                                     let rejection = ServerMessage::UsernameRejected(
                                         "Empty username".to_string(),
                                     );
-                                    let encoded_rejection = bincode::serialize(&rejection).unwrap();
-                                    socket.send_to(&encoded_rejection, src)?;
+                                    utils::broadcast_message(rejection, &socket, None, Some(src))?;
                                 } else {
                                     println!(
                                         "New client connected: {} (username: {})",
@@ -91,10 +88,12 @@ fn main() -> std::io::Result<()> {
                                         .insert(src, (next_id, username.clone(), Instant::now()));
 
                                     let welcome = Welcome { id: next_id };
-                                    let encoded_welcome =
-                                        bincode::serialize(&ServerMessage::Welcome(welcome))
-                                            .unwrap();
-                                    socket.send_to(&encoded_welcome, src)?;
+                                    utils::broadcast_message(
+                                        ServerMessage::Welcome(welcome),
+                                        &socket,
+                                        None,
+                                        Some(src),
+                                    )?;
 
                                     let new_player = Player::new(
                                         sprite_nums[(next_id % 10) as usize].to_string(),
@@ -111,11 +110,20 @@ fn main() -> std::io::Result<()> {
                                         bincode::serialize(&initial_state).unwrap();
                                     socket.send_to(&encoded_initial_state, src)?;
 
-                                    let leaderboard_update = ServerMessage::LeaderboardUpdate(game_state.leaderboard.clone().into_iter().map(|(name, score)| (name, score as usize)).collect());
-                                    let encoded_leaderboard_update = bincode::serialize(&leaderboard_update).unwrap();
-                                    for client_addr in clients.keys() {
-                                        socket.send_to(&encoded_leaderboard_update, client_addr).unwrap();
-                                    }
+                                    let leaderboard_update = ServerMessage::LeaderboardUpdate(
+                                        game_state
+                                            .leaderboard
+                                            .clone()
+                                            .into_iter()
+                                            .map(|(name, score)| (name, score as usize))
+                                            .collect(),
+                                    );
+                                    utils::broadcast_message(
+                                        leaderboard_update,
+                                        &socket,
+                                        Some(&clients),
+                                        None,
+                                    )?;
                                 }
                             }
                         }
@@ -134,32 +142,26 @@ fn main() -> std::io::Result<()> {
                                     if let Some(target) =
                                         game_state.players.get_mut(&target_id.to_string())
                                     {
-                                        if target.health == 20 {
-                                        let new_score = game_state
-                                            .leaderboard
-                                            .get(&shooter_name.clone())
-                                            .unwrap()
-                                            + 1;
-                                            if new_score >= 20 {
-                                                game_state.winner = Some(shooter_name.clone());
-                                                let winner_message = ServerMessage::Winner(shooter_name.clone());
-                                                let encoded_winner_message = bincode::serialize(&winner_message).unwrap();
-                                                for client_addr in clients.keys() {
-                                                    socket.send_to(&encoded_winner_message, client_addr).unwrap();
-                                                }
-                                                println!("Game over! Winner is {}", game_state.winner.unwrap());
-                                                return Ok(());
+                                        if target.take_damage(20) {
+                                            let new_score = utils::update_leaderboard(
+                                                &mut game_state,
+                                                shooter_name.clone(),
+                                                &socket,
+                                                &clients,
+                                                None,
+                                                Some(1),
+                                                false,
+                                            );
+
+                                            if new_score >= 1 {
+                                                utils::set_winner(
+                                                    &mut game_state,
+                                                    shooter_name.clone(),
+                                                    &socket,
+                                                    &clients,
+                                                );
                                             }
-                                        game_state
-                                            .leaderboard
-                                            .insert(shooter_name.clone(), new_score);
-                                        let leaderboard_update = ServerMessage::LeaderboardUpdate(game_state.leaderboard.clone().into_iter().map(|(name, score)| (name, score as usize)).collect());
-                                        let encoded_leaderboard_update = bincode::serialize(&leaderboard_update).unwrap();
-                                        for client_addr in clients.keys() {
-                                            socket.send_to(&encoded_leaderboard_update, client_addr).unwrap();
                                         }
-                                    }
-                                        target.take_damage(20);
                                     }
 
                                     // Send message about hit to clients
@@ -177,11 +179,12 @@ fn main() -> std::io::Result<()> {
                                         target_name,
                                     };
                                     let shot_hit_message = ServerMessage::ShotHit(hit);
-                                    let encoded_message =
-                                        bincode::serialize(&shot_hit_message).unwrap();
-                                    for client_addr in clients.keys() {
-                                        socket.send_to(&encoded_message, client_addr).unwrap();
-                                    }
+                                    utils::broadcast_message(
+                                        shot_hit_message,
+                                        &socket,
+                                        Some(&clients),
+                                        None,
+                                    )?;
                                 }
                             }
                         }
@@ -217,11 +220,16 @@ fn main() -> std::io::Result<()> {
 
                 // Remove player from leaderboard
                 game_state.leaderboard.remove(username);
-                let leaderboard_update = ServerMessage::LeaderboardUpdate(game_state.leaderboard.clone().into_iter().map(|(name, score)| (name, score as usize)).collect());
-                let encoded_leaderboard_update = bincode::serialize(&leaderboard_update).unwrap();
-                for client_addr in clients_clone.keys() {
-                    socket.send_to(&encoded_leaderboard_update, client_addr).unwrap();
-                }
+                let leaderboard_update = ServerMessage::LeaderboardUpdate(
+                    game_state
+                        .leaderboard
+                        .clone()
+                        .into_iter()
+                        .map(|(name, score)| (name, score as usize))
+                        .collect(),
+                );
+                utils::broadcast_message(leaderboard_update, &socket, Some(&clients_clone), None)
+                    .unwrap();
 
                 false
             } else {
@@ -233,10 +241,7 @@ fn main() -> std::io::Result<()> {
             game_state.players.remove(&id.to_string());
             client_inputs.remove(&id);
             let player_left_message = ServerMessage::PlayerLeft(id);
-            let encoded_message = bincode::serialize(&player_left_message).unwrap();
-            for client_addr in clients.keys() {
-                socket.send_to(&encoded_message, client_addr).unwrap();
-            }
+            utils::broadcast_message(player_left_message, &socket, Some(&clients), None)?;
         }
 
         // Game logic update and broadcast
@@ -289,21 +294,20 @@ fn main() -> std::io::Result<()> {
                 );
             }
 
-            let encoded_game_update =
-                bincode::serialize(&ServerMessage::GameUpdate(player_updates)).unwrap();
-
-            for client_addr in clients.keys() {
-                socket.send_to(&encoded_game_update, client_addr)?;
-            }
+            utils::broadcast_message(
+                ServerMessage::GameUpdate(player_updates),
+                &socket,
+                Some(&clients),
+                None,
+            )?;
 
             if sprites_changed {
-                let encoded_sprite_update = bincode::serialize(&ServerMessage::SpriteUpdate(
-                    game_state.floor_sprites.clone(),
-                ))
-                .unwrap();
-                for client_addr in clients.keys() {
-                    socket.send_to(&encoded_sprite_update, client_addr)?;
-                }
+                utils::broadcast_message(
+                    ServerMessage::SpriteUpdate(game_state.floor_sprites.clone()),
+                    &socket,
+                    Some(&clients),
+                    None,
+                )?;
             }
         }
 

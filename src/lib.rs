@@ -1,7 +1,7 @@
-use crate::{map::World};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap};
 use crate::gamestate::GameState;
+use crate::map::World;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub mod consts;
 pub mod flags;
@@ -13,6 +13,7 @@ pub mod renderer;
 pub mod spritesheet;
 pub mod text;
 pub mod textures;
+pub mod utils;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ClientMessage {
