@@ -17,8 +17,9 @@ use winit_input_helper::WinitInputHelper;
 
 use fps::{
     AnimationState::{Dying, Walking},
-    ClientMessage, gamestate::GameState, Input, ServerMessage,
+    ClientMessage, Input, ServerMessage,
     consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WALK_FRAME_TIME, WIDTH},
+    gamestate::GameState,
     player::Player,
     renderer::Renderer,
     spritesheet::hue_variations,
@@ -247,26 +248,6 @@ fn main() -> Result<()> {
         let delta_time = last_frame_time.elapsed().as_secs_f32();
         last_frame_time = Instant::now();
 
-        if let Some(gs) = &mut game_state {
-            for player in gs.players.values_mut() {
-                if player.animation_state == Walking {
-                    player.frame_timer += delta_time;
-                    if player.frame_timer > WALK_FRAME_TIME {
-                        player.frame_timer = 0.0;
-                        player.frame = (player.frame + 1) % 4;
-                    }
-                } else if player.animation_state == Dying {
-                    player.frame_timer += delta_time;
-                    if player.frame_timer > DIE_FRAME_TIME {
-                        player.frame_timer = 0.0;
-                        player.frame = cmp::min(player.frame + 1, 2);
-                    }
-                } else {
-                    player.frame = 0;
-                }
-            }
-        }
-
         match &event {
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta },
@@ -459,6 +440,26 @@ fn main() -> Result<()> {
                 Err(e) => {
                     eprintln!("Error receiving data: {}", e);
                     break;
+                }
+            }
+        }
+
+        if let Some(gs) = &mut game_state {
+            for player in gs.players.values_mut() {
+                if player.animation_state == Walking {
+                    player.frame_timer += delta_time;
+                    if player.frame_timer > WALK_FRAME_TIME {
+                        player.frame_timer = 0.0;
+                        player.frame = (player.frame + 1) % 4;
+                    }
+                } else if player.animation_state == Dying {
+                    player.frame_timer += delta_time;
+                    if player.frame_timer > DIE_FRAME_TIME {
+                        player.frame_timer = 0.0;
+                        player.frame = cmp::min(player.frame + 1, 2);
+                    }
+                } else {
+                    player.frame = 0;
                 }
             }
         }
