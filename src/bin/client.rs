@@ -306,7 +306,6 @@ fn main() -> Result<()> {
                 elwt.exit();
                 return;
             } else if game_state.as_ref().unwrap().winner.is_none() {
-
                 if input.key_pressed(KeyCode::Tab) {
                     cursor_grabbed = !cursor_grabbed;
                     window_clone.set_cursor_visible(!cursor_grabbed);
