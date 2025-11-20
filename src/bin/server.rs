@@ -1,6 +1,6 @@
 use fps::{
-    ClientMessage, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
-    player::Player, gamestate::GameState,
+    ClientMessage, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags, gamestate::GameState,
+    player::Player,
 };
 use local_ip_address::local_ip;
 use rand::prelude::*;
@@ -101,6 +101,7 @@ fn main() -> std::io::Result<()> {
                                         &game_state.world,
                                     );
                                     game_state.players.insert(next_id.to_string(), new_player);
+                                    game_state.leaderboard.insert(username.clone(), 0);
                                     client_inputs.insert(next_id, fps::Input::default()); // Initialize with default input
                                     next_id += 1;
 
@@ -109,6 +110,12 @@ fn main() -> std::io::Result<()> {
                                     let encoded_initial_state =
                                         bincode::serialize(&initial_state).unwrap();
                                     socket.send_to(&encoded_initial_state, src)?;
+
+                                    let leaderboard_update = ServerMessage::LeaderboardUpdate(game_state.leaderboard.clone().into_iter().map(|(name, score)| (name, score as usize)).collect());
+                                    let encoded_leaderboard_update = bincode::serialize(&leaderboard_update).unwrap();
+                                    for client_addr in clients.keys() {
+                                        socket.send_to(&encoded_leaderboard_update, client_addr).unwrap();
+                                    }
                                 }
                             }
                         }
@@ -127,6 +134,31 @@ fn main() -> std::io::Result<()> {
                                     if let Some(target) =
                                         game_state.players.get_mut(&target_id.to_string())
                                     {
+                                        if target.health == 20 {
+                                        let new_score = game_state
+                                            .leaderboard
+                                            .get(&shooter_name.clone())
+                                            .unwrap()
+                                            + 1;
+                                            if new_score >= 20 {
+                                                game_state.winner = Some(shooter_name.clone());
+                                                let winner_message = ServerMessage::Winner(shooter_name.clone());
+                                                let encoded_winner_message = bincode::serialize(&winner_message).unwrap();
+                                                for client_addr in clients.keys() {
+                                                    socket.send_to(&encoded_winner_message, client_addr).unwrap();
+                                                }
+                                                println!("Game over! Winner is {}", game_state.winner.unwrap());
+                                                return Ok(());
+                                            }
+                                        game_state
+                                            .leaderboard
+                                            .insert(shooter_name.clone(), new_score);
+                                        let leaderboard_update = ServerMessage::LeaderboardUpdate(game_state.leaderboard.clone().into_iter().map(|(name, score)| (name, score as usize)).collect());
+                                        let encoded_leaderboard_update = bincode::serialize(&leaderboard_update).unwrap();
+                                        for client_addr in clients.keys() {
+                                            socket.send_to(&encoded_leaderboard_update, client_addr).unwrap();
+                                        }
+                                    }
                                         target.take_damage(20);
                                     }
 
@@ -177,10 +209,20 @@ fn main() -> std::io::Result<()> {
         let now = Instant::now();
         let timeout = Duration::from_secs(5);
         let mut timed_out_clients = Vec::new();
+        let clients_clone = clients.clone();
         clients.retain(|_, (id, username, last_seen)| {
             if now.duration_since(*last_seen) > timeout {
                 println!("Client {} ({}) timed out.", id, username);
                 timed_out_clients.push(*id);
+
+                // Remove player from leaderboard
+                game_state.leaderboard.remove(username);
+                let leaderboard_update = ServerMessage::LeaderboardUpdate(game_state.leaderboard.clone().into_iter().map(|(name, score)| (name, score as usize)).collect());
+                let encoded_leaderboard_update = bincode::serialize(&leaderboard_update).unwrap();
+                for client_addr in clients_clone.keys() {
+                    socket.send_to(&encoded_leaderboard_update, client_addr).unwrap();
+                }
+
                 false
             } else {
                 true
@@ -242,6 +284,7 @@ fn main() -> std::io::Result<()> {
                         animation_state: player.animation_state.clone(),
                         shooting: player.shooting,
                         health: player.health,
+                        score: player.score,
                     },
                 );
             }
@@ -254,8 +297,10 @@ fn main() -> std::io::Result<()> {
             }
 
             if sprites_changed {
-                let encoded_sprite_update =
-                    bincode::serialize(&ServerMessage::SpriteUpdate(game_state.floor_sprites.clone())).unwrap();
+                let encoded_sprite_update = bincode::serialize(&ServerMessage::SpriteUpdate(
+                    game_state.floor_sprites.clone(),
+                ))
+                .unwrap();
                 for client_addr in clients.keys() {
                     socket.send_to(&encoded_sprite_update, client_addr)?;
                 }

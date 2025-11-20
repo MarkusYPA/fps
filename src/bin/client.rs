@@ -275,6 +275,7 @@ fn main() -> Result<()> {
                         renderer.render(gs, my_id);
                         renderer.draw_to_buffer(pixels.frame_mut());
                         renderer.display_health(gs, my_id, pixels.frame_mut());
+                        renderer.display_leaderboard(gs, pixels.frame_mut());
 
                         frame_count += 1;
                         if fps_timer.elapsed() >= Duration::from_secs(1) {
@@ -389,6 +390,7 @@ fn main() -> Result<()> {
                                             player.animation_state = update.animation_state;
                                             player.shooting = update.shooting;
                                             player.health = update.health;
+                                            player.score = update.score;
                                         } else {
                                             // New player joined — insert into local game state
                                             let mut p = Player::new("0".to_string(), &gs.world);
@@ -423,6 +425,11 @@ fn main() -> Result<()> {
                                     renderer.show_hit_marker(0x00FFFFFF);
                                 } else if hit.target_id == my_id {
                                     println!("{} shot me", hit.shooter_name);
+                                }
+                            }
+                            ServerMessage::LeaderboardUpdate(leaderboard) => {
+                                if let Some(ref mut gs) = game_state {
+                                    gs.leaderboard = leaderboard;
                                 }
                             }
                             _ => {}

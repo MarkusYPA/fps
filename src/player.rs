@@ -1,5 +1,5 @@
-use std::time::Duration;
 use rand::Rng;
+use std::time::Duration;
 
 use crate::consts::{
     DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, DIE_FRAME_TIME, PLAYER_JUMP_VELOCITY,
@@ -33,6 +33,7 @@ pub struct Player {
     pub health: u16,
     pub dying: bool,
     pub death_timer: Duration,
+    pub score: usize,
 }
 
 impl Player {
@@ -57,6 +58,7 @@ impl Player {
             health: 100,
             dying: false,
             death_timer: Duration::ZERO,
+            score: 0,
         }
     }
 
@@ -223,5 +225,4 @@ impl Player {
         // + 0.5 to center the player on the tile
         (x as f32 + 0.5, y as f32 + 0.5)
     }
-        
 }

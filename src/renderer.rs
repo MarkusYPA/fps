@@ -9,13 +9,14 @@ use crate::{
     Direction, GameState,
     consts::{
         CAMERA_HEIGHT_OFFSET, CAMERA_HEIGHT_OFFSET_DEAD, CAMERA_PLANE_SCALE, CEILING_COLOR,
-        CROSSHAIR_SCALE, FLOOR_COLOR, GUN_SCALE, GUN_X_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT,
-        SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
+        CROSSHAIR_SCALE, FLOOR_COLOR, GUN_SCALE, GUN_X_OFFSET, HEIGHT, MINIMAP_HEIGHT,
+        MINIMAP_MARGIN, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY,
+        WALL_COLOR_SECONDARY, WIDTH,
     },
     spritesheet::SpriteSheet,
     textures::TextureManager,
 };
-use rusttype::Font;
+use rusttype::{Font, Scale, point};
 
 fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
     let angle_diff = ((player_angle - camera_angle).to_degrees() + 180.0).rem_euclid(360.0);
@@ -490,6 +491,61 @@ impl<'a> Renderer<'a> {
         }
     }
 
+    fn measure_text_bounds(&self, text: &str, size: f32) -> (f32, f32) {
+        let scale = Scale::uniform(size);
+        let mut min_x = f32::INFINITY;
+        let mut max_x = f32::NEG_INFINITY;
+        let mut min_y = f32::INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+
+        for glyph in self.font.layout(text, scale, point(0.0, 0.0)) {
+            if let Some(bb) = glyph.pixel_bounding_box() {
+                min_x = min_x.min(bb.min.x as f32);
+                max_x = max_x.max(bb.max.x as f32);
+                min_y = min_y.min(bb.min.y as f32);
+                max_y = max_y.max(bb.max.y as f32);
+            }
+        }
+
+        if !min_x.is_finite() {
+            (0.0, 0.0)
+        } else {
+            (max_x - min_x, max_y - min_y)
+        }
+    }
+
+    pub fn fill_rect(
+        frame: &mut [u8],
+        rect_x: usize,
+        rect_y: usize,
+        rect_w: usize,
+        rect_h: usize,
+        color: [u8; 4],
+    ) {
+        for y in rect_y..(rect_y + rect_h) {
+            for x in rect_x..(rect_x + rect_w) {
+                if x < WIDTH && y < HEIGHT {
+                    let idx = (y * WIDTH + x) * 4;
+                    if idx + 3 < frame.len() {
+                        let bg_r = frame[idx];
+                        let bg_g = frame[idx + 1];
+                        let bg_b = frame[idx + 2];
+
+                        let alpha = color[3] as u16;
+                        let r = (color[0] as u16 * alpha + bg_r as u16 * (255 - alpha)) / 255;
+                        let g = (color[1] as u16 * alpha + bg_g as u16 * (255 - alpha)) / 255;
+                        let b = (color[2] as u16 * alpha + bg_b as u16 * (255 - alpha)) / 255;
+
+                        frame[idx] = r as u8;
+                        frame[idx + 1] = g as u8;
+                        frame[idx + 2] = b as u8;
+                        frame[idx + 3] = 255;
+                    }
+                }
+            }
+        }
+    }
+
     pub fn display_health(&self, game_state: &GameState, my_id: u64, frame: &mut [u8]) {
         if let Some(player) = game_state.players.get(&my_id.to_string()) {
             // Draw a semi-transparent black rectangle behind the health text
@@ -499,28 +555,7 @@ impl<'a> Renderer<'a> {
             let rect_h = 40;
             let color = [0, 0, 0, 128]; // semi-transparent black
 
-            for y in rect_y..(rect_y + rect_h) {
-                for x in rect_x..(rect_x + rect_w) {
-                    if x < WIDTH && y < HEIGHT {
-                        let idx = (y * WIDTH + x) * 4;
-                        if idx + 3 < frame.len() {
-                            let bg_r = frame[idx];
-                            let bg_g = frame[idx + 1];
-                            let bg_b = frame[idx + 2];
-
-                            let alpha = color[3] as u16;
-                            let r = (color[0] as u16 * alpha + bg_r as u16 * (255 - alpha)) / 255;
-                            let g = (color[1] as u16 * alpha + bg_g as u16 * (255 - alpha)) / 255;
-                            let b = (color[2] as u16 * alpha + bg_b as u16 * (255 - alpha)) / 255;
-
-                            frame[idx] = r as u8;
-                            frame[idx + 1] = g as u8;
-                            frame[idx + 2] = b as u8;
-                            frame[idx + 3] = 255;
-                        }
-                    }
-                }
-            }
+            Self::fill_rect(frame, rect_x, rect_y, rect_w, rect_h, color);
 
             draw_text(
                 frame,
@@ -542,5 +577,81 @@ impl<'a> Renderer<'a> {
                 [255, 255, 255, 255],
             );
         }
+    }
+
+    pub fn display_leaderboard(&self, game_state: &GameState, frame: &mut [u8]) {
+        let mut sorted_entries: Vec<_> = game_state.leaderboard.iter().collect();
+        sorted_entries.sort_by(|(name_a, score_a), (name_b, score_b)| {
+            score_b.cmp(score_a).then_with(|| name_a.cmp(name_b))
+        });
+
+        let formatted_entries: Vec<String> = sorted_entries
+            .into_iter()
+            .map(|(name, score)| format!("{}: {}", name, score))
+            .collect();
+
+        let title_text = "Leaderboard";
+        let title_font_size = 28.0;
+        let entry_font_size = 24.0;
+
+        let (title_width, title_height) = self.measure_text_bounds(title_text, title_font_size);
+        let mut max_entry_width = title_width;
+        for entry in &formatted_entries {
+            let (entry_width, _) = self.measure_text_bounds(entry, entry_font_size);
+            max_entry_width = max_entry_width.max(entry_width);
+        }
+
+        let padding_x = 16;
+        let padding_y = 12;
+        let header_gap = 10;
+        let row_gap = 6;
+        let rect_margin = 20;
+
+        let header_height = title_height.ceil() as usize + header_gap;
+        let row_height = entry_font_size.ceil() as usize + row_gap;
+        let rect_width = max_entry_width.ceil() as usize + padding_x * 2;
+        let rect_height = padding_y * 2 + header_height + formatted_entries.len() * row_height;
+
+        let rect_x = WIDTH.saturating_sub(rect_width + rect_margin);
+        let desired_rect_y = MINIMAP_MARGIN * 2 + MINIMAP_HEIGHT;
+        // Anchor below the minimap; extremely long lists may extend past the bottom.
+        let rect_y = desired_rect_y.min(HEIGHT.saturating_sub(1));
+
+        Self::fill_rect(
+            frame,
+            rect_x,
+            rect_y,
+            rect_width,
+            rect_height.max(1),
+            [0, 0, 0, 160],
+        );
+
+        let text_x = rect_x + padding_x;
+        let mut text_y = rect_y + padding_y;
+
+        draw_text(
+            frame,
+            &self.font,
+            title_text,
+            title_font_size,
+            text_x,
+            text_y,
+            [220, 210, 200, 255],
+        );
+
+        text_y += header_height;
+        for entry in &formatted_entries {
+            draw_text(
+                frame,
+                &self.font,
+                entry,
+                entry_font_size,
+                text_x,
+                text_y,
+                [255, 255, 255, 255],
+            );
+            text_y += row_height;
+        }
+        println!("Current leaderboard: {:?}", game_state.leaderboard);
     }
 }
