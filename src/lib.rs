@@ -11,6 +11,7 @@ pub mod minimap;
 pub mod player;
 pub mod renderer;
 pub mod spritesheet;
+pub mod text;
 pub mod textures;
 
 #[derive(Serialize, Deserialize, Debug)]

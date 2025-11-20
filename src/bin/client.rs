@@ -293,19 +293,21 @@ fn main() -> Result<()> {
                     if let Some(ref gs) = game_state {
                         renderer.render(gs, my_id);
                         renderer.draw_to_buffer(pixels.frame_mut());
+                        renderer.display_health(gs, my_id, pixels.frame_mut());
+
+                        frame_count += 1;
+                        if fps_timer.elapsed() >= Duration::from_secs(1) {
+                            let fps = frame_count;
+                            frame_count = 0;
+                            fps_timer = Instant::now();
+                            window_clone.set_title(&format!("Blob Hunter 3-D - {} FPS", fps));
+                        }
+
                         if let Err(err) = pixels.render() {
                             eprintln!("pixels.render() failed: {}", err);
                             elwt.exit();
                             return;
                         }
-                    }
-
-                    frame_count += 1;
-                    if fps_timer.elapsed() >= Duration::from_secs(1) {
-                        let fps = frame_count;
-                        frame_count = 0;
-                        fps_timer = Instant::now();
-                        window_clone.set_title(&format!("FPS Game - {} FPS", fps));
                     }
                 }
                 _ => (),
