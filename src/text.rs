@@ -1,5 +1,5 @@
-use rusttype::{point, Font, Scale};
 use crate::consts::{HEIGHT, WIDTH};
+use rusttype::{Font, Scale, point};
 
 pub fn draw_text(
     frame: &mut [u8],
@@ -29,10 +29,18 @@ pub fn draw_text(
                         let bg_b = frame[idx + 2];
                         let bg_a = frame[idx + 3];
 
-                        let r = (color[0] as u16 * pixel_alpha as u16 + bg_r as u16 * (255 - pixel_alpha) as u16) / 255;
-                        let g = (color[1] as u16 * pixel_alpha as u16 + bg_g as u16 * (255 - pixel_alpha) as u16) / 255;
-                        let b = (color[2] as u16 * pixel_alpha as u16 + bg_b as u16 * (255 - pixel_alpha) as u16) / 255;
-                        let a = (color[3] as u16 * pixel_alpha as u16 + bg_a as u16 * (255 - pixel_alpha) as u16) / 255;
+                        let r = (color[0] as u16 * pixel_alpha as u16
+                            + bg_r as u16 * (255 - pixel_alpha) as u16)
+                            / 255;
+                        let g = (color[1] as u16 * pixel_alpha as u16
+                            + bg_g as u16 * (255 - pixel_alpha) as u16)
+                            / 255;
+                        let b = (color[2] as u16 * pixel_alpha as u16
+                            + bg_b as u16 * (255 - pixel_alpha) as u16)
+                            / 255;
+                        let a = (color[3] as u16 * pixel_alpha as u16
+                            + bg_a as u16 * (255 - pixel_alpha) as u16)
+                            / 255;
 
                         frame[idx] = r as u8;
                         frame[idx + 1] = g as u8;

@@ -3,8 +3,7 @@ use crate::Input;
 use crate::Sprite;
 use crate::consts::MAX_PUDDLES;
 use crate::consts::{
-    CAMERA_HEIGHT_OFFSET, SHOT_MAX_DISTANCE, SPRITE_OTHER_PLAYER_HEIGHT,
-    SPRITE_OTHER_PLAYER_WIDTH,
+    CAMERA_HEIGHT_OFFSET, SHOT_MAX_DISTANCE, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH,
 };
 use crate::player::Player;
 use crate::{consts::RESPAWN_DELAY, map::World};
@@ -17,6 +16,8 @@ pub struct GameState {
     pub world: World,
     floor_sprite_id: u32,
     pub floor_sprites: HashMap<u32, Sprite>,
+    pub winner: Option<String>,
+    pub leaderboard: HashMap<String, usize>,
 }
 
 impl GameState {
@@ -32,6 +33,8 @@ impl GameState {
             world,
             floor_sprite_id: 0,
             floor_sprites: HashMap::new(),
+            winner: None,
+            leaderboard: HashMap::new(),
         }
     }
 

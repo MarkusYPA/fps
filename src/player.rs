@@ -1,5 +1,5 @@
-use std::time::Duration;
 use rand::Rng;
+use std::time::Duration;
 
 use crate::consts::{
     DEFAULT_PLAYER_MOVE_SPEED, DEFAULT_PLAYER_ROT_SPEED, DIE_FRAME_TIME, PLAYER_JUMP_VELOCITY,
@@ -33,6 +33,7 @@ pub struct Player {
     pub health: u16,
     pub dying: bool,
     pub death_timer: Duration,
+    pub score: usize,
 }
 
 impl Player {
@@ -57,6 +58,7 @@ impl Player {
             health: 100,
             dying: false,
             death_timer: Duration::ZERO,
+            score: 0,
         }
     }
 
@@ -184,7 +186,8 @@ impl Player {
         }
     }
 
-    pub fn take_damage(&mut self, damage: u16) {
+    /// Returns true if the player died due to that instance of damage
+    pub fn take_damage(&mut self, damage: u16) -> bool {
         if self.health > damage {
             self.health -= damage;
         } else if self.health > 0 {
@@ -193,9 +196,11 @@ impl Player {
             // Three frames, at 0,2 seconds. 3000 * 0.2 milliseconds = 0.6 seconds?
             self.death_timer =
                 Duration::from_millis((DIE_FRAME_TIME * 3000.0) as u64) + RESPAWN_DELAY;
+            return true;
         } else {
             self.health = 0;
         }
+        false
     }
 
     pub fn respawn(&mut self, map_x: f32, map_y: f32) {
@@ -223,5 +228,4 @@ impl Player {
         // + 0.5 to center the player on the tile
         (x as f32 + 0.5, y as f32 + 0.5)
     }
-        
 }

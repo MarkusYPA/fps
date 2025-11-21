@@ -6,6 +6,9 @@ pub const WIDTH: usize = 1024;
 pub const HEIGHT: usize = 768;
 pub const PORT: u16 = 8080;
 pub const FONT_PATH: &str = "assets/VT323-Regular.ttf";
+pub const TICK_RATE: u32 = 100;
+pub const WIN_SLEEP_TIME: Duration = Duration::from_secs(5);
+pub const SCORE_TO_WIN: usize = 1;
 
 pub const DEFAULT_MAP_ID: usize = 1;
 pub const MOUSE_SPEED: f32 = 0.06;
