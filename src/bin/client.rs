@@ -18,7 +18,7 @@ use winit_input_helper::WinitInputHelper;
 use fps::{
     AnimationState::{Dying, Walking},
     ClientMessage, GameState, Input, ServerMessage,
-    consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, WALK_FRAME_TIME, WIDTH},
+    consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, SHOOT_COOLDOWN, WALK_FRAME_TIME, WIDTH},
     player::Player,
     renderer::Renderer,
     spritesheet::hue_variations,
@@ -242,6 +242,7 @@ fn main() -> Result<()> {
     let mut prev_input: Option<Input> = None;
     let mut focused = false;
     let mut last_frame_time = Instant::now();
+    let mut last_shot_timestamp = Instant::now().checked_sub(SHOOT_COOLDOWN).unwrap_or(Instant::now());
 
     Ok(event_loop.run(move |event, elwt| {
         let delta_time = last_frame_time.elapsed().as_secs_f32();
@@ -347,11 +348,16 @@ fn main() -> Result<()> {
                 turn += 1.0;
             }
 
-            if input.mouse_pressed(MouseButton::Left) {
+            let can_shoot = last_shot_timestamp.elapsed() >= SHOOT_COOLDOWN;
+            let mouse_pressed = input.mouse_pressed(MouseButton::Left);
+            
+            if mouse_pressed && can_shoot {
                 let shot_message = ClientMessage::Shot;
                 let encoded_shot = bincode::serialize(&shot_message).unwrap();
                 if let Err(e) = socket.send(&encoded_shot) {
                     eprintln!("Error sending shot data: {}", e);
+                } else {
+                    last_shot_timestamp = Instant::now();
                 }
             }
 
@@ -364,7 +370,7 @@ fn main() -> Result<()> {
                 pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
                 jump: input.key_pressed(KeyCode::Space),
                 sprint: input.key_held(KeyCode::ShiftLeft),
-                shoot: input.mouse_pressed(MouseButton::Left),
+                shoot: mouse_pressed && can_shoot,
             };
             mouse_dx = 0.0;
             mouse_dy = 0.0;

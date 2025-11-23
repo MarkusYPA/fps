@@ -1,5 +1,5 @@
 use fps::{
-    ClientMessage, GameState, PlayerUpdate, ServerMessage, Welcome, consts::PORT, flags,
+    ClientMessage, GameState, PlayerUpdate, ServerMessage, Welcome, consts::{PORT, SHOOT_COOLDOWN}, flags,
     player::Player,
 };
 use local_ip_address::local_ip;
@@ -29,6 +29,7 @@ fn main() -> std::io::Result<()> {
     let mut game_state = GameState::new(Some(parsed_flags.map));
     let mut clients = HashMap::<SocketAddr, (u64, String, Instant)>::new();
     let mut client_inputs = HashMap::<u64, fps::Input>::new();
+    let mut last_shot_timestamp = HashMap::<u64, Instant>::new();
     let mut next_id: u64 = 0;
 
     // Create and shuffle numbers for assigning random sprites to players
@@ -115,6 +116,11 @@ fn main() -> std::io::Result<()> {
                         }
                         ClientMessage::Input(input) => {
                             if let Some((id, _, _)) = clients.get(&src) {
+                                // Process shoot=true immediately since mouse_pressed is only true for one frame, causing
+                                // a later Input { shoot: false } to overwrite it in client_inputs before the tick processes it.
+                                if input.shoot {
+                                    game_state.update(id.to_string(), &input, tick_duration);
+                                }
                                 client_inputs.insert(*id, input);
                             }
                         }
@@ -123,6 +129,17 @@ fn main() -> std::io::Result<()> {
                         }
                         ClientMessage::Shot => {
                             if let Some((shooter_id, shooter_name, _)) = clients.get(&src) {
+                                let can_shoot = last_shot_timestamp
+                                    .get(shooter_id)
+                                    .map(|last_time| last_time.elapsed() >= SHOOT_COOLDOWN)
+                                    .unwrap_or(true); // First shot is always allowed
+                                
+                                if !can_shoot {
+                                    continue;
+                                }
+                                
+                                last_shot_timestamp.insert(*shooter_id, Instant::now());
+                                
                                 if let Some(target_id) = game_state.measure_shot(shooter_id) {
 
                                     // reduce target hp
