@@ -172,6 +172,11 @@ fn main() -> std::io::Result<()> {
                             }
                             ClientMessage::Input(input) => {
                                 if let Some((id, _, _)) = clients.get(&src) {
+                                    // Process shoot=true immediately since mouse_pressed is only true for one frame, causing
+                                    // a later Input { shoot: false } to overwrite it in client_inputs before the tick processes it.
+                                    if input.shoot {
+                                        game_state.update(id.to_string(), &input, tick_duration);
+                                    }
                                     client_inputs.insert(*id, input);
                                 }
                             }
