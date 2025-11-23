@@ -5,6 +5,13 @@ use image::Rgba;
 pub const WIDTH: usize = 1024;
 pub const HEIGHT: usize = 768;
 pub const PORT: u16 = 8080;
+pub const FONT_PATH: &str = "assets/VT323-Regular.ttf";
+pub const TICK_RATE: u32 = 100;
+pub const WIN_SLEEP_TIME: Duration = Duration::from_secs(5);
+pub const SCORE_TO_WIN: usize = 1;
+
+pub const MOUSE_SENSITIVITY_MIN: f32 = 0.01;
+pub const MOUSE_SENSITIVITY_MAX: f32 = 0.20;
 
 pub const DEFAULT_MAP_ID: usize = 1;
 pub const MOUSE_SPEED: f32 = 0.06;
@@ -22,8 +29,8 @@ pub const PLAYER_PITCH_LIMIT: f32 = std::f32::consts::PI / 2.5;
 pub const PLAYER_SPRINT_SPEED_MULTIPLIER: f32 = 2.0;
 pub const PLAYER_RADIUS: f32 = 0.2;
 
-pub const MINIMAP_WIDTH: usize = 150;
-pub const MINIMAP_HEIGHT: usize = 150;
+pub const MINIMAP_WIDTH: usize = 160;
+pub const MINIMAP_HEIGHT: usize = 160;
 pub const MINIMAP_MARGIN: usize = 10;
 pub const MINIMAP_BACKGROUND_COLOR: u32 = 0x0011_1111;
 pub const MINIMAP_WALL_COLOR: u32 = 0x0044_4444;
@@ -50,3 +57,5 @@ pub const CROSSHAIR_SCALE: f32 = 0.5;
 pub const SHOT_TIME: Duration = Duration::from_millis(35);
 pub const SHOOT_COOLDOWN: Duration = Duration::from_millis(500);
 pub const SHOT_MAX_DISTANCE: f32 = 200.0;
+
+pub const MAX_PUDDLES: usize = 100;

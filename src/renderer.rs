@@ -1,18 +1,45 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+use crate::consts::FONT_PATH;
+use crate::text::draw_text;
 use crate::textures::{self};
 use crate::{
     AnimationState::{Dead, Dying, Idle, Shooting, Walking},
     Direction, GameState,
     consts::{
         CAMERA_HEIGHT_OFFSET, CAMERA_HEIGHT_OFFSET_DEAD, CAMERA_PLANE_SCALE, CEILING_COLOR,
-        CROSSHAIR_SCALE, FLOOR_COLOR, GUN_SCALE, GUN_X_OFFSET, HEIGHT, SPRITE_OTHER_PLAYER_HEIGHT,
-        SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
+        CROSSHAIR_SCALE, FLOOR_COLOR, GUN_SCALE, GUN_X_OFFSET, HEIGHT, MINIMAP_HEIGHT,
+        MINIMAP_MARGIN, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY,
+        WALL_COLOR_SECONDARY, WIDTH,
     },
     spritesheet::SpriteSheet,
     textures::TextureManager,
 };
+use rusttype::{Font, Scale, point};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MenuHover {
+    Quit,
+    MouseSensitivity,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MenuBounds {
+    pub x: usize,
+    pub y: usize,
+    pub width: usize,
+    pub height: usize,
+}
+
+impl MenuBounds {
+    pub fn contains(&self, x: f32, y: f32) -> bool {
+        x >= self.x as f32
+            && x < (self.x + self.width) as f32
+            && y >= self.y as f32
+            && y < (self.y + self.height) as f32
+    }
+}
 
 fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
     let angle_diff = ((player_angle - camera_angle).to_degrees() + 180.0).rem_euclid(360.0);
@@ -31,7 +58,7 @@ fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
     }
 }
 
-pub struct Renderer {
+pub struct Renderer<'a> {
     pub buffer: Vec<u32>,
     pub z_buffer: Vec<f32>,
     pub texture_manager: TextureManager,
@@ -40,6 +67,7 @@ pub struct Renderer {
     hit_marker_start: Option<Instant>,
     hit_marker_color: u32,
     hit_marker_duration: Duration,
+    font: Font<'a>,
 }
 
 struct SpriteInfo<'a> {
@@ -53,11 +81,14 @@ struct SpriteInfo<'a> {
     frame: Option<&'a textures::Texture>,
 }
 
-impl Renderer {
+impl<'a> Renderer<'a> {
     pub fn new(
         texture_manager: TextureManager,
         sprite_sheets: HashMap<String, SpriteSheet>,
     ) -> Self {
+        let font_data = std::fs::read(FONT_PATH).unwrap();
+        let font = Font::try_from_vec(font_data).unwrap();
+
         Renderer {
             buffer: vec![0; WIDTH * HEIGHT],
             z_buffer: vec![0.0; WIDTH],
@@ -66,6 +97,7 @@ impl Renderer {
             hit_marker_start: None,
             hit_marker_color: 0x00FFFFFF,
             hit_marker_duration: Duration::from_millis(400),
+            font,
         }
     }
 
@@ -264,11 +296,11 @@ impl Renderer {
                 }
             }
 
-            // sprites from world
+            // floor sprites (puddles) from world
             let mut sprite_infos: Vec<SpriteInfo> = game_state
-                .sprites
+                .floor_sprites
                 .iter()
-                .map(|s| {
+                .map(|(_, s)| {
                     let sprite_x = s.x - player.x;
                     let sprite_y = s.y - player.y;
                     SpriteInfo {
@@ -285,6 +317,7 @@ impl Renderer {
                 .collect();
 
             // sprites from other players
+            let mut player_sprites = Vec::new();
             for (id, other_player) in &game_state.players {
                 if id != &my_id.to_string() {
                     let direction = get_direction(other_player.angle, player.angle);
@@ -310,7 +343,7 @@ impl Renderer {
 
                     let sprite_x = other_player.x - player.x;
                     let sprite_y = other_player.y - player.y;
-                    sprite_infos.push(SpriteInfo {
+                    player_sprites.push(SpriteInfo {
                         x: other_player.x,
                         y: other_player.y,
                         z: other_player.z,
@@ -323,12 +356,22 @@ impl Renderer {
                 }
             }
 
-            // Sort sprites by distance
+            // Sort floor sprites (puddles) by distance
             sprite_infos.sort_by(|a, b| {
                 b.dist_sq
                     .partial_cmp(&a.dist_sq)
                     .unwrap_or(std::cmp::Ordering::Equal)
             });
+
+            // Sort player sprites by distance
+            player_sprites.sort_by(|a, b| {
+                b.dist_sq
+                    .partial_cmp(&a.dist_sq)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            // Combine sprite vectors so puddles are always behind players
+            sprite_infos.append(&mut player_sprites);
 
             // sprites to buffer
             for sprite_info in sprite_infos {
@@ -469,5 +512,323 @@ impl Renderer {
             let rgba = [(color >> 16) as u8, (color >> 8) as u8, color as u8, 0xFF];
             pixel.copy_from_slice(&rgba);
         }
+    }
+
+    fn measure_text_bounds(&self, text: &str, size: f32) -> (f32, f32) {
+        let scale = Scale::uniform(size);
+        let mut min_x = f32::INFINITY;
+        let mut max_x = f32::NEG_INFINITY;
+        let mut min_y = f32::INFINITY;
+        let mut max_y = f32::NEG_INFINITY;
+
+        for glyph in self.font.layout(text, scale, point(0.0, 0.0)) {
+            if let Some(bb) = glyph.pixel_bounding_box() {
+                min_x = min_x.min(bb.min.x as f32);
+                max_x = max_x.max(bb.max.x as f32);
+                min_y = min_y.min(bb.min.y as f32);
+                max_y = max_y.max(bb.max.y as f32);
+            }
+        }
+
+        if !min_x.is_finite() {
+            (0.0, 0.0)
+        } else {
+            (max_x - min_x, max_y - min_y)
+        }
+    }
+
+    pub fn fill_rect(
+        frame: &mut [u8],
+        rect_x: usize,
+        rect_y: usize,
+        rect_w: usize,
+        rect_h: usize,
+        color: [u8; 4],
+    ) {
+        for y in rect_y..(rect_y + rect_h) {
+            for x in rect_x..(rect_x + rect_w) {
+                if x < WIDTH && y < HEIGHT {
+                    let idx = (y * WIDTH + x) * 4;
+                    if idx + 3 < frame.len() {
+                        let bg_r = frame[idx];
+                        let bg_g = frame[idx + 1];
+                        let bg_b = frame[idx + 2];
+
+                        let alpha = color[3] as u16;
+                        let r = (color[0] as u16 * alpha + bg_r as u16 * (255 - alpha)) / 255;
+                        let g = (color[1] as u16 * alpha + bg_g as u16 * (255 - alpha)) / 255;
+                        let b = (color[2] as u16 * alpha + bg_b as u16 * (255 - alpha)) / 255;
+
+                        frame[idx] = r as u8;
+                        frame[idx + 1] = g as u8;
+                        frame[idx + 2] = b as u8;
+                        frame[idx + 3] = 255;
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn display_health(&self, game_state: &GameState, my_id: u64, frame: &mut [u8]) {
+        if let Some(player) = game_state.players.get(&my_id.to_string()) {
+            // Draw a semi-transparent black rectangle behind the health text
+            let rect_x = 100;
+            let rect_y = HEIGHT - 55;
+            let rect_w = 150;
+            let rect_h = 40;
+            let color = [0, 0, 0, 128]; // semi-transparent black
+
+            Self::fill_rect(frame, rect_x, rect_y, rect_w, rect_h, color);
+
+            draw_text(
+                frame,
+                &self.font,
+                "Health",
+                30.0,
+                110,
+                HEIGHT - 50,
+                [220, 210, 200, 255],
+            );
+
+            draw_text(
+                frame,
+                &self.font,
+                &player.health.to_string(),
+                30.0,
+                200,
+                HEIGHT - 50,
+                [255, 255, 255, 255],
+            );
+        }
+    }
+
+    pub fn display_leaderboard(&self, game_state: &GameState, frame: &mut [u8]) {
+        let mut sorted_entries: Vec<_> = game_state.leaderboard.iter().collect();
+        sorted_entries.sort_by(|(name_a, score_a), (name_b, score_b)| {
+            score_b.cmp(score_a).then_with(|| name_a.cmp(name_b))
+        });
+
+        let formatted_entries: Vec<String> = sorted_entries
+            .into_iter()
+            .map(|(name, score)| format!("{}: {}", name, score))
+            .collect();
+
+        let title_text = "Leaderboard";
+        let title_font_size = 28.0;
+        let entry_font_size = 24.0;
+
+        let (title_width, title_height) = self.measure_text_bounds(title_text, title_font_size);
+        let mut max_entry_width = title_width;
+        for entry in &formatted_entries {
+            let (entry_width, _) = self.measure_text_bounds(entry, entry_font_size);
+            max_entry_width = max_entry_width.max(entry_width);
+        }
+
+        let padding_x = 16;
+        let padding_y = 12;
+        let header_gap = 10;
+        let row_gap = 6;
+        let rect_margin = 20;
+
+        let header_height = title_height.ceil() as usize + header_gap;
+        let row_height = entry_font_size.ceil() as usize + row_gap;
+        let rect_width = max_entry_width.ceil() as usize + padding_x * 2;
+        let rect_height = padding_y * 2 + header_height + formatted_entries.len() * row_height;
+
+        let rect_x = WIDTH.saturating_sub(rect_width + rect_margin);
+        let desired_rect_y = MINIMAP_MARGIN * 2 + MINIMAP_HEIGHT;
+        // Anchor below the minimap; extremely long lists may extend past the bottom.
+        let rect_y = desired_rect_y.min(HEIGHT.saturating_sub(1));
+
+        Self::fill_rect(
+            frame,
+            rect_x,
+            rect_y,
+            rect_width,
+            rect_height.max(1),
+            [0, 0, 0, 160],
+        );
+
+        let text_x = rect_x + padding_x;
+        let mut text_y = rect_y + padding_y;
+
+        draw_text(
+            frame,
+            &self.font,
+            title_text,
+            title_font_size,
+            text_x,
+            text_y,
+            [220, 210, 200, 255],
+        );
+
+        text_y += header_height;
+        for entry in &formatted_entries {
+            draw_text(
+                frame,
+                &self.font,
+                entry,
+                entry_font_size,
+                text_x,
+                text_y,
+                [255, 255, 255, 255],
+            );
+            text_y += row_height;
+        }
+    }
+
+    pub fn display_winner(&self, winner_name: &str, frame: &mut [u8]) {
+        let font_size = 150.0;
+        let text = format!("{} Won!", winner_name);
+
+        // Measure text to determine box size
+        let (text_width, text_height) = self.measure_text_bounds(&text, font_size);
+
+        // Add padding around the text (40 pixels on each side)
+        let padding = 40;
+        let rect_w = (text_width as usize) + padding * 2;
+        let rect_h = (text_height as usize) + padding * 2;
+
+        // Center the box on screen
+        let rect_x = (WIDTH - rect_w) / 2;
+        let rect_y = (HEIGHT - rect_h) / 2;
+        let color = [0, 0, 0, 200]; // semi-transparent black
+
+        Self::fill_rect(frame, rect_x, rect_y, rect_w, rect_h, color);
+
+        // Center text horizontally within the box
+        let text_x = rect_x + (rect_w as f32 / 2.0 - text_width / 2.0) as usize;
+
+        // Center text vertically
+        // draw_text uses (y + v_metrics.ascent) as the baseline
+        // To center the text, we position it so the visual center aligns with the box center
+        let box_center_y = rect_y as f32 + rect_h as f32 / 2.0;
+        let text_y = (box_center_y - text_height) as usize;
+
+        draw_text(
+            frame,
+            &self.font,
+            &text,
+            font_size,
+            text_x,
+            text_y,
+            [255, 215, 0, 255], // Gold color for winner text
+        );
+    }
+
+    pub fn get_menu_item_bounds(&self, mouse_sensitivity: f32) -> (MenuBounds, MenuBounds) {
+        let font_size = 80.0;
+        let item_spacing = 120;
+        let margin = 100;
+        let title_y = margin + 80;
+        let title_bottom = title_y + 100;
+        let menu_center_x = WIDTH / 2;
+        let menu_start_y = title_bottom + 60;
+
+        let quit_text = "Quit";
+        let (quit_width, quit_height) = self.measure_text_bounds(quit_text, font_size);
+        let quit_x = menu_center_x - (quit_width / 2.0) as usize;
+        let quit_y = menu_start_y;
+        let quit_bounds = MenuBounds {
+            x: quit_x,
+            y: quit_y,
+            width: quit_width as usize,
+            height: quit_height as usize,
+        };
+
+        let sensitivity_text = format!("Mouse Sensitivity: {:.2}", mouse_sensitivity);
+        let (sens_width, sens_height) = self.measure_text_bounds(&sensitivity_text, font_size);
+        let sens_x = menu_center_x - (sens_width / 2.0) as usize;
+        let sens_y = menu_start_y + item_spacing;
+        let sens_bounds = MenuBounds {
+            x: sens_x,
+            y: sens_y,
+            width: sens_width as usize,
+            height: sens_height as usize,
+        };
+
+        (quit_bounds, sens_bounds)
+    }
+
+    pub fn display_menu(
+        &self,
+        mouse_sensitivity: f32,
+        frame: &mut [u8],
+        hovered_item: Option<MenuHover>,
+    ) {
+        let margin = 100;
+        let rect_x = margin;
+        let rect_y = margin;
+        let rect_w = WIDTH - margin * 2;
+        let rect_h = HEIGHT - margin * 2;
+        let bg_color = [0, 0, 0, 200];
+
+        Self::fill_rect(frame, rect_x, rect_y, rect_w, rect_h, bg_color);
+
+        let title_text = "Blob Hunter 3D";
+        let title_font_size = 120.0;
+        let title_color = [255, 215, 0, 255];
+        let (title_width, _title_height) = self.measure_text_bounds(title_text, title_font_size);
+        let title_x = WIDTH / 2 - (title_width / 2.0) as usize;
+        let title_y = margin + 80;
+
+        draw_text(
+            frame,
+            &self.font,
+            title_text,
+            title_font_size,
+            title_x,
+            title_y,
+            title_color,
+        );
+
+        let font_size = 80.0;
+        let item_spacing = 120;
+        let title_bottom = title_y + 100;
+
+        let menu_center_x = WIDTH / 2;
+        let menu_start_y = title_bottom + 60;
+
+        let quit_text = "Quit";
+        let (quit_width, _quit_height) = self.measure_text_bounds(quit_text, font_size);
+        let quit_x = menu_center_x - (quit_width / 2.0) as usize;
+        let quit_y = menu_start_y;
+
+        let quit_color = if hovered_item == Some(MenuHover::Quit) {
+            [255, 200, 0, 255]
+        } else {
+            [255, 255, 255, 255]
+        };
+
+        draw_text(
+            frame,
+            &self.font,
+            quit_text,
+            font_size,
+            quit_x,
+            quit_y,
+            quit_color,
+        );
+
+        let sensitivity_text = format!("Mouse Sensitivity: {:.2}", mouse_sensitivity);
+        let (sens_width, _sens_height) = self.measure_text_bounds(&sensitivity_text, font_size);
+        let sens_x = menu_center_x - (sens_width / 2.0) as usize;
+        let sens_y = menu_start_y + item_spacing;
+
+        let sens_color = if hovered_item == Some(MenuHover::MouseSensitivity) {
+            [255, 200, 0, 255]
+        } else {
+            [255, 255, 255, 255]
+        };
+
+        draw_text(
+            frame,
+            &self.font,
+            &sensitivity_text,
+            font_size,
+            sens_x,
+            sens_y,
+            sens_color,
+        );
     }
 }

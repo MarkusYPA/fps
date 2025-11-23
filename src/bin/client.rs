@@ -17,26 +17,49 @@ use winit_input_helper::WinitInputHelper;
 
 use fps::{
     AnimationState::{Dying, Walking},
-    ClientMessage, GameState, Input, ServerMessage,
-    consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, PORT, SHOOT_COOLDOWN, WALK_FRAME_TIME, WIDTH},
+    ClientMessage, Input, ServerMessage,
+    consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, MOUSE_SENSITIVITY_MAX, MOUSE_SENSITIVITY_MIN, PORT, SHOOT_COOLDOWN, WALK_FRAME_TIME, WIDTH},
+    gamestate::GameState,
     player::Player,
-    renderer::Renderer,
+    renderer::{MenuHover, Renderer},
     spritesheet::hue_variations,
     textures::TextureManager,
 };
 
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 struct Config {
     last_name: Option<String>,
     recent_servers: Vec<String>,
+    mouse_sensitivity: Option<f32>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            last_name: None,
+            recent_servers: Vec::new(),
+            mouse_sensitivity: None,
+        }
+    }
+}
+
+fn save_config(config: &Config) -> Result<()> {
+    let config_path = "client_config.toml";
+    let config_str = toml::to_string_pretty(config)?;
+    std::fs::write(config_path, config_str)?;
+    Ok(())
+}
+
+fn load_config() -> Config {
+    let config_path = "client_config.toml";
+    std::fs::read_to_string(config_path)
+        .ok()
+        .and_then(|content| toml::from_str(&content).ok())
+        .unwrap_or_default()
 }
 
 fn connect_to_server() -> Result<Option<(UdpSocket, u64, String)>> {
-    let config_path = "client_config.toml";
-    let mut config: Config = std::fs::read_to_string(config_path)
-        .ok()
-        .and_then(|content| toml::from_str(&content).ok())
-        .unwrap_or_default();
+    let mut config = load_config();
 
     loop {
         // Get server IP
@@ -136,8 +159,7 @@ fn connect_to_server() -> Result<Option<(UdpSocket, u64, String)>> {
                                     config.recent_servers.retain(|s| s != &addr_string);
                                     config.recent_servers.insert(0, addr_string);
                                     config.recent_servers.truncate(5);
-                                    let config_str = toml::to_string_pretty(&config)?;
-                                    std::fs::write(config_path, config_str)?;
+                                    save_config(&config)?;
 
                                     return Ok(Some((socket, welcome.id, final_username)));
                                 }
@@ -243,37 +265,25 @@ fn main() -> Result<()> {
     let mut focused = false;
     let mut last_frame_time = Instant::now();
     let mut last_shot_timestamp = Instant::now().checked_sub(SHOOT_COOLDOWN).unwrap_or(Instant::now());
+    let mut show_menu = false;
+    let mut config = load_config();
+    let mut mouse_sensitivity = config
+        .mouse_sensitivity
+        .unwrap_or(MOUSE_SPEED)
+        .clamp(MOUSE_SENSITIVITY_MIN, MOUSE_SENSITIVITY_MAX);
+    let mut cursor_pos = (0.0, 0.0);
+    let mut menu_hovered_item: Option<MenuHover> = None;
 
     Ok(event_loop.run(move |event, elwt| {
         let delta_time = last_frame_time.elapsed().as_secs_f32();
         last_frame_time = Instant::now();
-
-        if let Some(gs) = &mut game_state {
-            for player in gs.players.values_mut() {
-                if player.animation_state == Walking {
-                    player.frame_timer += delta_time;
-                    if player.frame_timer > WALK_FRAME_TIME {
-                        player.frame_timer = 0.0;
-                        player.frame = (player.frame + 1) % 4;
-                    }
-                } else if player.animation_state == Dying {
-                    player.frame_timer += delta_time;
-                    if player.frame_timer > DIE_FRAME_TIME {
-                        player.frame_timer = 0.0;
-                        player.frame = cmp::min(player.frame + 1, 2);
-                    }
-                } else {
-                    player.frame = 0;
-                }
-            }
-        }
 
         match &event {
             Event::DeviceEvent {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
-                if !first_mouse_move && cursor_grabbed && focused {
+                if !first_mouse_move && cursor_grabbed && focused && !show_menu {
                     mouse_dx = delta.0 as f32;
                     mouse_dy = delta.1 as f32;
                 } else {
@@ -285,6 +295,11 @@ fn main() -> Result<()> {
                     elwt.exit();
                     return;
                 }
+                WindowEvent::CursorMoved { position, .. } => {
+                    if show_menu {
+                        cursor_pos = (position.x as f32, position.y as f32);
+                    }
+                }
                 WindowEvent::Focused(is_focused) => {
                     focused = *is_focused;
                     center_and_grab_cursor(window_clone.clone());
@@ -294,19 +309,31 @@ fn main() -> Result<()> {
                     if let Some(ref gs) = game_state {
                         renderer.render(gs, my_id);
                         renderer.draw_to_buffer(pixels.frame_mut());
+                        renderer.display_health(gs, my_id, pixels.frame_mut());
+                        renderer.display_leaderboard(gs, pixels.frame_mut());
+
+                        if let Some(winner) = &gs.winner {
+                            renderer.display_winner(&winner, pixels.frame_mut());
+                        }
+
+                        // Display menu if it's open
+                        if show_menu {
+                            renderer.display_menu(mouse_sensitivity, pixels.frame_mut(), menu_hovered_item);
+                        }
+
+                        frame_count += 1;
+                        if fps_timer.elapsed() >= Duration::from_secs(1) {
+                            let fps = frame_count;
+                            frame_count = 0;
+                            fps_timer = Instant::now();
+                            window_clone.set_title(&format!("Blob Hunter 3-D - {} FPS", fps));
+                        }
+
                         if let Err(err) = pixels.render() {
                             eprintln!("pixels.render() failed: {}", err);
                             elwt.exit();
                             return;
                         }
-                    }
-
-                    frame_count += 1;
-                    if fps_timer.elapsed() >= Duration::from_secs(1) {
-                        let fps = frame_count;
-                        frame_count = 0;
-                        fps_timer = Instant::now();
-                        window_clone.set_title(&format!("FPS Game - {} FPS", fps));
                     }
                 }
                 _ => (),
@@ -315,73 +342,155 @@ fn main() -> Result<()> {
         }
 
         if input.update(&event) {
-            if input.key_pressed(KeyCode::Escape) || input.close_requested() {
+            if input.close_requested() {
                 elwt.exit();
                 return;
             }
+            if input.key_pressed(KeyCode::Escape) {
+                show_menu = !show_menu;
+                if show_menu {
+                    cursor_grabbed = false;
+                    window_clone.set_cursor_visible(true);
+                    window_clone.set_cursor_grab(CursorGrabMode::None).unwrap();
 
-            if input.key_pressed(KeyCode::Tab) {
-                cursor_grabbed = !cursor_grabbed;
-                window_clone.set_cursor_visible(!cursor_grabbed);
-                let grab_mode = if cursor_grabbed {
-                    CursorGrabMode::Confined
-                } else {
-                    CursorGrabMode::None
-                };
-                window_clone
-                    .set_cursor_grab(grab_mode)
-                    .or_else(|_e| {
-                        if cursor_grabbed {
-                            window_clone.set_cursor_grab(CursorGrabMode::Locked)
-                        } else {
-                            window_clone.set_cursor_grab(CursorGrabMode::None)
+                    // Clear inputs and send zero input to server to make sure character stops when menu is opened
+                    mouse_dx = 0.0;
+                    mouse_dy = 0.0;
+
+                    if let Some(ref gs) = game_state {
+                        if gs.winner.is_none() {
+                            let zero_input = Input {
+                                forth: false,
+                                back: false,
+                                left: false,
+                                right: false,
+                                turn: 0.0,
+                                pitch: 0.0,
+                                jump: false,
+                                sprint: false,
+                                shoot: false,
+                            };
+                            let encoded_input = bincode::serialize(&ClientMessage::Input(zero_input)).unwrap();
+                            if let Err(e) = socket.send(&encoded_input) {
+                                eprintln!("Error sending zero input: {}", e);
+                            }
+                            prev_input = None;
                         }
-                    })
-                    .unwrap();
-            }
-
-            let mut turn = mouse_dx * MOUSE_SPEED;
-            if input.key_held(KeyCode::ArrowLeft) {
-                turn -= 1.0;
-            }
-            if input.key_held(KeyCode::ArrowRight) {
-                turn += 1.0;
-            }
-
-            let can_shoot = last_shot_timestamp.elapsed() >= SHOOT_COOLDOWN;
-            let mouse_pressed = input.mouse_pressed(MouseButton::Left);
-            
-            if mouse_pressed && can_shoot {
-                let shot_message = ClientMessage::Shot;
-                let encoded_shot = bincode::serialize(&shot_message).unwrap();
-                if let Err(e) = socket.send(&encoded_shot) {
-                    eprintln!("Error sending shot data: {}", e);
+                    }
                 } else {
-                    last_shot_timestamp = Instant::now();
+                    // Re-grab cursor when menu closes
+                    center_and_grab_cursor(window_clone.clone());
+                    cursor_grabbed = true;
+                    first_mouse_move = true;
                 }
             }
 
-            let client_input = Input {
-                forth: input.key_held(KeyCode::ArrowUp) || input.key_held(KeyCode::KeyW),
-                back: input.key_held(KeyCode::ArrowDown) || input.key_held(KeyCode::KeyS),
-                left: input.key_held(KeyCode::KeyA),
-                right: input.key_held(KeyCode::KeyD),
-                turn,
-                pitch: -mouse_dy * MOUSE_SPEED, // Invert mouse_dy for natural pitch control
-                jump: input.key_pressed(KeyCode::Space),
-                sprint: input.key_held(KeyCode::ShiftLeft),
-                shoot: mouse_pressed && can_shoot,
-            };
-            mouse_dx = 0.0;
-            mouse_dy = 0.0;
+            if show_menu {
+                // Update hover state and handle menu clicks
+                let (quit_bounds, sens_bounds) = renderer.get_menu_item_bounds(mouse_sensitivity);
+                menu_hovered_item = if quit_bounds.contains(cursor_pos.0, cursor_pos.1) {
+                    Some(MenuHover::Quit)
+                } else if sens_bounds.contains(cursor_pos.0, cursor_pos.1) {
+                    Some(MenuHover::MouseSensitivity)
+                } else {
+                    None
+                };
 
-            if Some(client_input.clone()) != prev_input {
-                let encoded_input =
-                    bincode::serialize(&ClientMessage::Input(client_input.clone())).unwrap();
-                if let Err(e) = socket.send(&encoded_input) {
-                    eprintln!("Error sending data: {}", e);
+                let mut sensitivity_changed = false;
+                if input.mouse_pressed(MouseButton::Left) {
+                    if quit_bounds.contains(cursor_pos.0, cursor_pos.1) {
+                        elwt.exit();
+                        return;
+                    } else if sens_bounds.contains(cursor_pos.0, cursor_pos.1) {
+                        mouse_sensitivity += 0.01;
+                        if mouse_sensitivity > MOUSE_SENSITIVITY_MAX {
+                            mouse_sensitivity = MOUSE_SENSITIVITY_MIN;
+                        }
+                        sensitivity_changed = true;
+                    }
+                } else if input.mouse_pressed(MouseButton::Right) {
+                    if sens_bounds.contains(cursor_pos.0, cursor_pos.1) {
+                        mouse_sensitivity -= 0.01;
+                        if mouse_sensitivity < MOUSE_SENSITIVITY_MIN {
+                            mouse_sensitivity = MOUSE_SENSITIVITY_MAX;
+                        }
+                        sensitivity_changed = true;
+                    }
                 }
-                prev_input = Some(client_input.clone());
+
+                if sensitivity_changed {
+                    config.mouse_sensitivity = Some(mouse_sensitivity);
+                    if let Err(e) = save_config(&config) {
+                        eprintln!("Error saving config: {}", e);
+                    }
+                }
+            } else {
+                menu_hovered_item = None;
+            }
+            if !show_menu && game_state.as_ref().map(|gs| gs.winner.is_none()).unwrap_or(false) {
+                if input.key_pressed(KeyCode::Tab) {
+                    cursor_grabbed = !cursor_grabbed;
+                    window_clone.set_cursor_visible(!cursor_grabbed);
+                    let grab_mode = if cursor_grabbed {
+                        CursorGrabMode::Confined
+                    } else {
+                        CursorGrabMode::None
+                    };
+                    window_clone
+                        .set_cursor_grab(grab_mode)
+                        .or_else(|_e| {
+                            if cursor_grabbed {
+                                window_clone.set_cursor_grab(CursorGrabMode::Locked)
+                            } else {
+                                window_clone.set_cursor_grab(CursorGrabMode::None)
+                            }
+                        })
+                        .unwrap();
+                }
+
+                let mut turn = mouse_dx * mouse_sensitivity;
+                if input.key_held(KeyCode::ArrowLeft) {
+                    turn -= 1.0;
+                }
+                if input.key_held(KeyCode::ArrowRight) {
+                    turn += 1.0;
+                }
+
+                let can_shoot = last_shot_timestamp.elapsed() >= SHOOT_COOLDOWN;
+                let mouse_pressed = input.mouse_pressed(MouseButton::Left);
+                
+                if mouse_pressed && can_shoot {
+                    let shot_message = ClientMessage::Shot;
+                    let encoded_shot = bincode::serialize(&shot_message).unwrap();
+                    if let Err(e) = socket.send(&encoded_shot) {
+                        eprintln!("Error sending shot data: {}", e);
+                    } else {
+                        last_shot_timestamp = Instant::now();
+                    }
+                }
+
+                let client_input = Input {
+                    forth: input.key_held(KeyCode::ArrowUp) || input.key_held(KeyCode::KeyW),
+                    back: input.key_held(KeyCode::ArrowDown) || input.key_held(KeyCode::KeyS),
+                    left: input.key_held(KeyCode::KeyA),
+                    right: input.key_held(KeyCode::KeyD),
+                    turn,
+                    pitch: -mouse_dy * mouse_sensitivity, // Invert mouse_dy for natural pitch control
+                    jump: input.key_pressed(KeyCode::Space),
+                    sprint: input.key_held(KeyCode::ShiftLeft),
+                    shoot: mouse_pressed && can_shoot,
+                };
+                mouse_dx = 0.0;
+                mouse_dy = 0.0;
+
+                if Some(client_input.clone()) != prev_input {
+                    let encoded_input =
+                        bincode::serialize(&ClientMessage::Input(client_input.clone())).unwrap();
+                    if let Err(e) = socket.send(&encoded_input) {
+                        eprintln!("Error sending data: {}", e);
+                    }
+                    prev_input = Some(client_input.clone());
+                }
             }
         }
 
@@ -412,9 +521,10 @@ fn main() -> Result<()> {
                                             player.animation_state = update.animation_state;
                                             player.shooting = update.shooting;
                                             player.health = update.health;
+                                            player.score = update.score;
                                         } else {
                                             // New player joined — insert into local game state
-                                            let mut p = Player::new("0".to_string());
+                                            let mut p = Player::new("0".to_string(), &gs.world);
                                             p.x = update.x;
                                             p.y = update.y;
                                             p.z = update.z;
@@ -427,6 +537,11 @@ fn main() -> Result<()> {
                                             gs.players.insert(id.clone(), p);
                                         }
                                     }
+                                }
+                            }
+                            ServerMessage::SpriteUpdate(new_sprites) => {
+                                if let Some(ref mut gs) = game_state {
+                                    gs.floor_sprites = new_sprites;
                                 }
                             }
                             ServerMessage::PlayerLeft(id) => {
@@ -443,6 +558,17 @@ fn main() -> Result<()> {
                                     println!("{} shot me", hit.shooter_name);
                                 }
                             }
+                            ServerMessage::LeaderboardUpdate(leaderboard) => {
+                                if let Some(ref mut gs) = game_state {
+                                    gs.leaderboard = leaderboard;
+                                }
+                            }
+                            ServerMessage::Winner(winner) => {
+                                if let Some(ref mut gs) = game_state {
+                                    gs.winner = Some(winner);
+                                }
+                                break;
+                            }
                             _ => {}
                         }
                     }
@@ -458,6 +584,26 @@ fn main() -> Result<()> {
                 Err(e) => {
                     eprintln!("Error receiving data: {}", e);
                     break;
+                }
+            }
+        }
+
+        if let Some(gs) = &mut game_state {
+            for player in gs.players.values_mut() {
+                if player.animation_state == Walking {
+                    player.frame_timer += delta_time;
+                    if player.frame_timer > WALK_FRAME_TIME {
+                        player.frame_timer = 0.0;
+                        player.frame = (player.frame + 1) % 4;
+                    }
+                } else if player.animation_state == Dying {
+                    player.frame_timer += delta_time;
+                    if player.frame_timer > DIE_FRAME_TIME {
+                        player.frame_timer = 0.0;
+                        player.frame = cmp::min(player.frame + 1, 2);
+                    }
+                } else {
+                    player.frame = 0;
                 }
             }
         }

@@ -7,11 +7,11 @@ use crate::{
     consts::MINIMAP_WALL_COLOR, consts::MINIMAP_WIDTH, consts::WIDTH,
 };
 
-impl Renderer {
+impl<'a> Renderer<'a> {
     // ===== Minimap Helper Functions =====
 
     /// Fill a rectangle with a color
-    fn fill_rect(&mut self, x: usize, y: usize, width: usize, height: usize, color: u32) {
+    fn fill_rect_minimap(&mut self, x: usize, y: usize, width: usize, height: usize, color: u32) {
         for row in 0..height {
             let py = y + row;
             if py >= HEIGHT {
@@ -65,7 +65,7 @@ impl Renderer {
                 break;
             }
             step_count += 1;
-
+            // Plot the pixel if within bounds
             if x >= 0 && x < WIDTH as i32 && y >= 0 && y < HEIGHT as i32 {
                 self.buffer[y as usize * WIDTH + x as usize] = color;
             }
@@ -73,7 +73,7 @@ impl Renderer {
             if x == x1 && y == y1 {
                 break;
             }
-
+            // Update error term and coordinates
             let e2 = err * 2;
             if e2 > -dy {
                 err -= dy;
@@ -93,19 +93,33 @@ impl Renderer {
         let start_x = WIDTH - minimap_width - MINIMAP_MARGIN;
         let start_y = MINIMAP_MARGIN;
 
-        // Get actual map dimensions
-        let map_width = game_state.world.map.len();
-        let map_height = if map_width > 0 {
+        // Get actual map dimensions (fix swapped width/height)
+        let map_height = game_state.world.map.len();
+        let map_width = if map_height > 0 {
             game_state.world.map[0].len()
         } else {
             1
         };
 
-        // Calculate tile size based on actual map dimensions
-        let tile_size = minimap_width / map_width.max(1);
+        // Use dynamic fractional tile mapping for perfect fit on any map size
+        let map_w = map_width.max(1) as f32;
+        let map_h = map_height.max(1) as f32;
+        let mmw = minimap_width as f32;
+        let mmh = minimap_height as f32;
 
-        // Draw background (border and background fill)
-        self.fill_rect(
+        // Calculate tile size that fits both dimensions and preserves aspect ratio
+        let tile_size_f = (mmw / map_w).min(mmh / map_h);
+        let total_w = tile_size_f * map_w;
+        let total_h = tile_size_f * map_h;
+
+        // Center the map in the minimap box
+        let offset_x = (mmw - total_w) * 0.5;
+        let offset_y = (mmh - total_h) * 0.5;
+        let base_x = start_x as f32 + offset_x;
+        let base_y = start_y as f32 + offset_y;
+
+        // Draw background first
+        self.fill_rect_minimap(
             start_x,
             start_y,
             minimap_width,
@@ -113,42 +127,59 @@ impl Renderer {
             MINIMAP_BACKGROUND_COLOR,
         );
 
-        // Draw world tiles
-        for y in 0..map_height {
-            for x in 0..map_width {
-                let px = start_x + x * tile_size;
-                let py = start_y + y * tile_size;
-                let tile = game_state.world.get_tile(x, y);
+        // Draw tiles with fractional positioning for perfect coverage
+        for tile_y in 0..map_height {
+            let y0_f = base_y + tile_y as f32 * tile_size_f;
+            let y1_f = base_y + (tile_y + 1) as f32 * tile_size_f;
+            let py0 = y0_f.floor() as usize;
+            let py1 = y1_f.ceil() as usize;
+
+            if py1 <= py0 {
+                continue;
+            }
+
+            for tile_x in 0..map_width {
+                let x0_f = base_x + tile_x as f32 * tile_size_f;
+                let x1_f = base_x + (tile_x + 1) as f32 * tile_size_f;
+                let px0 = x0_f.floor() as usize;
+                let px1 = x1_f.ceil() as usize;
+
+                if px1 <= px0 {
+                    continue;
+                }
+
+                let tile = game_state.world.get_tile(tile_x, tile_y);
                 let tile_color = if tile > 0 {
                     MINIMAP_WALL_COLOR
                 } else {
                     MINIMAP_OPEN_SPACE_COLOR
                 };
-                self.fill_rect(px, py, tile_size, tile_size, tile_color);
 
-                // Draw grid lines
+                self.fill_rect_minimap(px0, py0, px1 - px0, py1 - py0, tile_color);
+
+                // Draw grid lines at tile boundaries
                 self.draw_line(
-                    px as i32,
-                    py as i32,
-                    (px + tile_size) as i32,
-                    py as i32,
+                    px0 as i32,
+                    py0 as i32,
+                    px1 as i32,
+                    py0 as i32,
                     MINIMAP_GRID_COLOR,
                 );
                 self.draw_line(
-                    px as i32,
-                    py as i32,
-                    px as i32,
-                    (py + tile_size) as i32,
+                    px0 as i32,
+                    py0 as i32,
+                    px0 as i32,
+                    py1 as i32,
                     MINIMAP_GRID_COLOR,
                 );
             }
         }
 
-        // Draw all other players as dots
+        // Draw all other players using the dynamic coordinate system
         for (id, player) in &game_state.players {
             if id != &my_id.to_string() {
-                let px = start_x + (player.x * tile_size as f32) as usize;
-                let py = start_y + (player.y * tile_size as f32) as usize;
+                let px = (base_x + player.x * tile_size_f).round() as usize;
+                let py = (base_y + player.y * tile_size_f).round() as usize;
                 self.draw_circle(
                     px,
                     py,
@@ -165,8 +196,8 @@ impl Renderer {
                 let (icon_w, icon_h) = (icon_size as i32, icon_size as i32);
                 let (half_w, half_h) = (icon_w / 2, icon_h / 2);
 
-                let center_px = start_x as f32 + player.x * tile_size as f32;
-                let center_py = start_y as f32 + player.y * tile_size as f32;
+                let center_px = base_x + player.x * tile_size_f;
+                let center_py = base_y + player.y * tile_size_f;
 
                 let tex_cx = tex.width as f32 * 0.5;
                 let tex_cy = tex.height as f32 * 0.5;
