@@ -9,6 +9,11 @@ pub const FONT_PATH: &str = "assets/VT323-Regular.ttf";
 pub const TICK_RATE: u32 = 100;
 pub const WIN_SLEEP_TIME: Duration = Duration::from_secs(5);
 pub const SCORE_TO_WIN: usize = 1;
+pub const DEFAULT_MAP_WIDTH: usize = 14;
+pub const DEFAULT_MAP_HEIGHT: usize = 14;
+pub const DEFAULT_MAP_INCLUDE_CORNERS: bool = false;
+pub const DEFAULT_RANDOM_MAP_PATH_DEVIATION_CHANCE: usize = 60;
+pub const DEFAULT_RANDOM_MAP_HOLE_CHANCE: usize = 10;
 
 pub const DEFAULT_MAP_ID: usize = 1;
 pub const MOUSE_SPEED: f32 = 0.06;

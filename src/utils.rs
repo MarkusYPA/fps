@@ -2,8 +2,12 @@
 
 use crate::ServerMessage;
 use crate::gamestate::GameState;
+use crate::map::World;
 use std::collections::HashMap;
 use std::net::{SocketAddr, UdpSocket};
+use rand::seq::SliceRandom;
+use rand::Rng;
+use crate::consts::{DEFAULT_RANDOM_MAP_PATH_DEVIATION_CHANCE, DEFAULT_RANDOM_MAP_HOLE_CHANCE};
 
 pub fn set_winner(
     game_state: &mut GameState,
@@ -101,4 +105,82 @@ pub fn broadcast_message(
         }
     }
     Ok(())
+}
+
+/// Returns true if all adjacent tiles are walls, also checks corners if include_corners is true
+pub fn check_adjacent_tiles(world: &World, tile: (usize, usize), ignore_tile: (usize, usize), include_corners: bool) -> bool {
+    for dx in -1..=1 {
+        for dy in -1..=1 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            // Skip corners if not including them
+            if !include_corners && dx != 0 && dy != 0 {
+                continue;
+            }
+            let nx = tile.0 as i32 + dx;
+            let ny = tile.1 as i32 + dy;
+            // For ignoring previously cut out tiles
+            if nx == ignore_tile.0 as i32 && ny == ignore_tile.1 as i32 {
+                continue;
+            }
+            if nx >= 0 && ny >= 0 {
+                let nx = nx as usize;
+                let ny = ny as usize;
+                if ny < world.map.len() && nx < world.map[ny].len() {
+                    if world.get_tile(ny, nx) == 0 {
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+    true
+}
+
+pub fn carve_path(world: &mut World, tile: (usize, usize), include_corners: bool, prev_direction: Option<(i32, i32)>) {
+    world.map[tile.1][tile.0] = 0;
+    let mut directions = vec![(0, 1), (0, -1), (1, 0), (-1, 0)];
+    let mut rng = rand::rng();
+    
+    // Prioritize previous direction if available, with a small chance to deviate
+    if let Some(prev_dir) = prev_direction {
+        // chance to deviate from previous direction
+        if rng.random_range(0..100) < DEFAULT_RANDOM_MAP_PATH_DEVIATION_CHANCE {
+            directions.shuffle(&mut rng);
+        } else {
+            directions.retain(|&d| d != prev_dir);
+            directions.insert(0, prev_dir);
+            // Shuffle remaining directions
+            if directions.len() > 1 {
+                let first = directions.remove(0);
+                directions.shuffle(&mut rng);
+                directions.insert(0, first);
+            }
+        }
+    } else {
+        directions.shuffle(&mut rng);
+    }
+
+    for (dx, dy) in directions {
+        let nx = tile.0 as i32 + dx;
+        let ny = tile.1 as i32 + dy;
+        // 1 instead of 0 to not carve out the edges of the map
+        if nx < 1 || ny < 1 {
+            continue;
+        }
+        let nx = nx as usize;
+        let ny = ny as usize;
+        // -1 instead of len() to not carve out the edges of the map
+        if ny < world.map.len()-1 && nx < world.map[ny].len()-1 {
+            if world.get_tile(ny, nx) == 0 {
+                continue;
+            }
+            if check_adjacent_tiles(world, (nx, ny), tile, include_corners) {
+                carve_path(world, (nx, ny), include_corners, Some((dx, dy)));
+            } else if rng.random_range(0..100) < DEFAULT_RANDOM_MAP_HOLE_CHANCE {
+                carve_path(world, (nx, ny), include_corners, Some((dx, dy)));
+            }
+        }
+    }
 }

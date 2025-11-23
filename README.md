@@ -34,9 +34,13 @@ The client will prompt you to enter the server's IP address. Copy the IP address
 
 The game window will open, and you can start playing. The client captures your keyboard input, sends it to the server, and the server sends back the updated game state to be rendered.
 
-## Select Map
+## Server Options
 
-A set of map files in toml format is stored in the folder maps/. Choose one from 1 to 3 by using the flag '--map' or '-m' followed by a number. The game will default to map 1 if no choice is made.
+The server supports several command-line flags to customize map selection and game behavior.
+
+### Select a Specific Map
+
+A set of map files in toml format is stored in the folder maps/. Choose one from 1 to 3 by using the flag `--map` or `-m` followed by a number. The game will default to map 1 if no choice is made.
 
 ```bash
 cargo run --release --bin server -- --map 3
@@ -53,6 +57,42 @@ cargo run --release --bin server -- --map your_map_name_here
 or
 ```bash
 cargo run --release --bin server -- -m your_map_name_here
+```
+
+### Use a Random Premade Map
+
+If you don't specify a map, the server will randomly select one of the premade maps (1-3) for each new game round. This is the default behavior when no map flags are provided.
+
+### Use a Randomly Generated Map
+
+Use the `--random-map` or `-rm` flag to have the server generate a completely random map for each game round instead of using a premade map.
+
+```bash
+cargo run --release --bin server -- --random-map
+```
+or
+```bash
+cargo run --release --bin server -- -rm
+```
+
+**Note:** You cannot use both `--map` and `--random-map` at the same time.
+
+### Keep Map Between Matches
+
+Use the `--permanent-map` or `-pm` flag to keep the same map across all game rounds. Without this flag, the server will select a new map (or generate a new random map) for each new game round.
+
+```bash
+cargo run --release --bin server -- --permanent-map
+```
+or
+```bash
+cargo run --release --bin server -- -pm
+```
+
+You can combine `--permanent-map` with `--map` to use a specific map that persists across rounds:
+
+```bash
+cargo run --release --bin server -- --map 2 --permanent-map
 ```
 
 ## Controls
