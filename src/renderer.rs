@@ -9,9 +9,9 @@ use crate::{
     Direction, GameState,
     consts::{
         CAMERA_HEIGHT_OFFSET, CAMERA_HEIGHT_OFFSET_DEAD, CAMERA_PLANE_SCALE, CEILING_COLOR,
-        CROSSHAIR_SCALE, FLOOR_COLOR, GUN_SCALE, GUN_X_OFFSET, HEIGHT, MINIMAP_HEIGHT,
-        MINIMAP_MARGIN, SPRITE_OTHER_PLAYER_HEIGHT, SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY,
-        WALL_COLOR_SECONDARY, WIDTH,
+        CROSSHAIR_SCALE, DAMAGE_FLASH_DURATION, FLOOR_COLOR, GUN_SCALE, GUN_X_OFFSET, HEIGHT,
+        HIT_MARKER_DURATION, MINIMAP_HEIGHT, MINIMAP_MARGIN, SPRITE_OTHER_PLAYER_HEIGHT,
+        SPRITE_OTHER_PLAYER_WIDTH, WALL_COLOR_PRIMARY, WALL_COLOR_SECONDARY, WIDTH,
     },
     spritesheet::SpriteSheet,
     textures::TextureManager,
@@ -67,6 +67,9 @@ pub struct Renderer<'a> {
     hit_marker_start: Option<Instant>,
     hit_marker_color: u32,
     hit_marker_duration: Duration,
+    // Transient damage flash state: when set, renderer will flash a red overlay
+    damage_flash_start: Option<Instant>,
+    damage_flash_duration: Duration,
     font: Font<'a>,
 }
 
@@ -96,7 +99,9 @@ impl<'a> Renderer<'a> {
             sprite_sheets,
             hit_marker_start: None,
             hit_marker_color: 0x00FFFFFF,
-            hit_marker_duration: Duration::from_millis(400),
+            hit_marker_duration: HIT_MARKER_DURATION,
+            damage_flash_start: None,
+            damage_flash_duration: DAMAGE_FLASH_DURATION,
             font,
         }
     }
@@ -105,6 +110,11 @@ impl<'a> Renderer<'a> {
     pub fn show_hit_marker(&mut self, color: u32) {
         self.hit_marker_start = Some(Instant::now());
         self.hit_marker_color = color;
+    }
+
+    // Trigger a transient damage flash (red overlay).
+    pub fn show_damage_flash(&mut self) {
+        self.damage_flash_start = Some(Instant::now());
     }
 
     fn draw_sprite_2d(
@@ -714,6 +724,18 @@ impl<'a> Renderer<'a> {
             text_y,
             [255, 215, 0, 255], // Gold color for winner text
         );
+    }
+
+    pub fn took_damage(&mut self, frame: &mut [u8]) {
+        if let Some(start) = self.damage_flash_start {
+            if start.elapsed() < self.damage_flash_duration {
+                let color = [255, 0, 0, 64]; // semi-transparent red
+                Self::fill_rect(frame, 0, 0, WIDTH, HEIGHT, color);
+            } else {
+                // Clear the flash state after duration expires
+                self.damage_flash_start = None;
+            }
+        }
     }
 
     pub fn get_menu_item_bounds(&self, mouse_sensitivity: f32) -> (MenuBounds, MenuBounds) {
