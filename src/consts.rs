@@ -10,6 +10,9 @@ pub const TICK_RATE: u32 = 100;
 pub const WIN_SLEEP_TIME: Duration = Duration::from_secs(5);
 pub const SCORE_TO_WIN: usize = 1;
 
+pub const MOUSE_SENSITIVITY_MIN: f32 = 0.01;
+pub const MOUSE_SENSITIVITY_MAX: f32 = 0.20;
+
 pub const DEFAULT_MAP_ID: usize = 1;
 pub const MOUSE_SPEED: f32 = 0.06;
 pub const CAMERA_HEIGHT_OFFSET: f32 = 0.1;

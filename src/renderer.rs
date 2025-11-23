@@ -18,6 +18,29 @@ use crate::{
 };
 use rusttype::{Font, Scale, point};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MenuHover {
+    Quit,
+    MouseSensitivity,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MenuBounds {
+    pub x: usize,
+    pub y: usize,
+    pub width: usize,
+    pub height: usize,
+}
+
+impl MenuBounds {
+    pub fn contains(&self, x: f32, y: f32) -> bool {
+        x >= self.x as f32
+            && x < (self.x + self.width) as f32
+            && y >= self.y as f32
+            && y < (self.y + self.height) as f32
+    }
+}
+
 fn get_direction(player_angle: f32, camera_angle: f32) -> Direction {
     let angle_diff = ((player_angle - camera_angle).to_degrees() + 180.0).rem_euclid(360.0);
     let direction_index = (angle_diff / 45.0).round() as usize % 8;
@@ -690,6 +713,122 @@ impl<'a> Renderer<'a> {
             text_x,
             text_y,
             [255, 215, 0, 255], // Gold color for winner text
+        );
+    }
+
+    pub fn get_menu_item_bounds(&self, mouse_sensitivity: f32) -> (MenuBounds, MenuBounds) {
+        let font_size = 80.0;
+        let item_spacing = 120;
+        let margin = 100;
+        let title_y = margin + 80;
+        let title_bottom = title_y + 100;
+        let menu_center_x = WIDTH / 2;
+        let menu_start_y = title_bottom + 60;
+
+        let quit_text = "Quit";
+        let (quit_width, quit_height) = self.measure_text_bounds(quit_text, font_size);
+        let quit_x = menu_center_x - (quit_width / 2.0) as usize;
+        let quit_y = menu_start_y;
+        let quit_bounds = MenuBounds {
+            x: quit_x,
+            y: quit_y,
+            width: quit_width as usize,
+            height: quit_height as usize,
+        };
+
+        let sensitivity_text = format!("Mouse Sensitivity: {:.2}", mouse_sensitivity);
+        let (sens_width, sens_height) = self.measure_text_bounds(&sensitivity_text, font_size);
+        let sens_x = menu_center_x - (sens_width / 2.0) as usize;
+        let sens_y = menu_start_y + item_spacing;
+        let sens_bounds = MenuBounds {
+            x: sens_x,
+            y: sens_y,
+            width: sens_width as usize,
+            height: sens_height as usize,
+        };
+
+        (quit_bounds, sens_bounds)
+    }
+
+    pub fn display_menu(
+        &self,
+        mouse_sensitivity: f32,
+        frame: &mut [u8],
+        hovered_item: Option<MenuHover>,
+    ) {
+        let margin = 100;
+        let rect_x = margin;
+        let rect_y = margin;
+        let rect_w = WIDTH - margin * 2;
+        let rect_h = HEIGHT - margin * 2;
+        let bg_color = [0, 0, 0, 200];
+
+        Self::fill_rect(frame, rect_x, rect_y, rect_w, rect_h, bg_color);
+
+        let title_text = "Blob Hunter 3D";
+        let title_font_size = 120.0;
+        let title_color = [255, 215, 0, 255];
+        let (title_width, _title_height) = self.measure_text_bounds(title_text, title_font_size);
+        let title_x = WIDTH / 2 - (title_width / 2.0) as usize;
+        let title_y = margin + 80;
+
+        draw_text(
+            frame,
+            &self.font,
+            title_text,
+            title_font_size,
+            title_x,
+            title_y,
+            title_color,
+        );
+
+        let font_size = 80.0;
+        let item_spacing = 120;
+        let title_bottom = title_y + 100;
+
+        let menu_center_x = WIDTH / 2;
+        let menu_start_y = title_bottom + 60;
+
+        let quit_text = "Quit";
+        let (quit_width, _quit_height) = self.measure_text_bounds(quit_text, font_size);
+        let quit_x = menu_center_x - (quit_width / 2.0) as usize;
+        let quit_y = menu_start_y;
+
+        let quit_color = if hovered_item == Some(MenuHover::Quit) {
+            [255, 200, 0, 255]
+        } else {
+            [255, 255, 255, 255]
+        };
+
+        draw_text(
+            frame,
+            &self.font,
+            quit_text,
+            font_size,
+            quit_x,
+            quit_y,
+            quit_color,
+        );
+
+        let sensitivity_text = format!("Mouse Sensitivity: {:.2}", mouse_sensitivity);
+        let (sens_width, _sens_height) = self.measure_text_bounds(&sensitivity_text, font_size);
+        let sens_x = menu_center_x - (sens_width / 2.0) as usize;
+        let sens_y = menu_start_y + item_spacing;
+
+        let sens_color = if hovered_item == Some(MenuHover::MouseSensitivity) {
+            [255, 200, 0, 255]
+        } else {
+            [255, 255, 255, 255]
+        };
+
+        draw_text(
+            frame,
+            &self.font,
+            &sensitivity_text,
+            font_size,
+            sens_x,
+            sens_y,
+            sens_color,
         );
     }
 }
