@@ -310,9 +310,18 @@ fn main() -> std::io::Result<()> {
                     sprites_changed = true;
                 }
 
+                // Send sprite updates before checking for win to ensure puddles are sent
+                if sprites_changed {
+                    utils::broadcast_message(
+                        ServerMessage::SpriteUpdate(game_state.floor_sprites.clone()),
+                        &socket,
+                        Some(&clients),
+                        None,
+                    )?;
+                }
+
                 // Check for pending win after death animations complete
                 if let Some((winner_name, _score)) = &_pending_win {
-                    // Check if any players are still dying
                     let any_dying = game_state.players.values().any(|p| p.dying);
                     if !any_dying {
                         // All death animations complete, declare winner
@@ -359,15 +368,6 @@ fn main() -> std::io::Result<()> {
                     Some(&clients),
                     None,
                 )?;
-
-                if sprites_changed {
-                    utils::broadcast_message(
-                        ServerMessage::SpriteUpdate(game_state.floor_sprites.clone()),
-                        &socket,
-                        Some(&clients),
-                        None,
-                    )?;
-                }
             }
 
             // Sleep for a short duration to prevent busy-waiting, but allow for immediate processing if a message arrives
