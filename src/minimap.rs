@@ -11,7 +11,7 @@ impl<'a> Renderer<'a> {
     // ===== Minimap Helper Functions =====
 
     /// Fill a rectangle with a color
-    fn fill_rect(&mut self, x: usize, y: usize, width: usize, height: usize, color: u32) {
+    fn fill_rect_minimap(&mut self, x: usize, y: usize, width: usize, height: usize, color: u32) {
         for row in 0..height {
             let py = y + row;
             if py >= HEIGHT {
@@ -119,7 +119,7 @@ impl<'a> Renderer<'a> {
         let base_y = start_y as f32 + offset_y;
 
         // Draw background first
-        self.fill_rect(
+        self.fill_rect_minimap(
             start_x,
             start_y,
             minimap_width,
@@ -155,7 +155,7 @@ impl<'a> Renderer<'a> {
                     MINIMAP_OPEN_SPACE_COLOR
                 };
 
-                self.fill_rect(px0, py0, px1 - px0, py1 - py0, tile_color);
+                self.fill_rect_minimap(px0, py0, px1 - px0, py1 - py0, tile_color);
 
                 // Draw grid lines at tile boundaries
                 self.draw_line(

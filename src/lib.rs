@@ -1,7 +1,7 @@
-use crate::{map::World};
-use serde::{Deserialize, Serialize};
-use std::{collections::HashMap};
 use crate::gamestate::GameState;
+use crate::map::World;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub mod consts;
 pub mod flags;
@@ -13,6 +13,7 @@ pub mod renderer;
 pub mod spritesheet;
 pub mod text;
 pub mod textures;
+pub mod utils;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ClientMessage {
@@ -26,11 +27,13 @@ pub enum ClientMessage {
 pub enum ServerMessage {
     Welcome(Welcome),
     GameUpdate(HashMap<String, PlayerUpdate>),
+    LeaderboardUpdate(HashMap<String, usize>),
     SpriteUpdate(HashMap<u32, Sprite>),
     InitialState(GameState),
     UsernameRejected(String),
     PlayerLeft(u64),
     ShotHit(Hit),
+    Winner(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -78,6 +81,7 @@ pub struct PlayerUpdate {
     pub animation_state: AnimationState,
     pub shooting: bool,
     pub health: u16,
+    pub score: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Default)]
