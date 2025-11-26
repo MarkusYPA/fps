@@ -34,7 +34,7 @@ fn main() -> std::io::Result<()> {
             }
         );
         parsed_flags.map
-    } else if parsed_flags.random_map {
+    } else if random_map {
         println!("Using randomly generated map");
         flags::MapIdentifier::Random
     } else {
@@ -66,7 +66,7 @@ fn main() -> std::io::Result<()> {
         _pending_win = None; // Reset pending win for new round
         if !used_map || parsed_flags.permanent_map {
             used_map = true;
-            game_state = GameState::new(Some(current_map.clone()), None, None);
+            game_state = GameState::new(Some(current_map.clone()), parsed_flags.rand_map_width, parsed_flags.rand_map_height);
         } else {
             if random_map {
                 game_state = GameState::new(

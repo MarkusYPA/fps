@@ -22,14 +22,14 @@ pub const RESPAWN_DELAY: Duration = Duration::from_secs(4);
 pub const MOUSE_SPEED: f32 = 0.06;
 pub const MOUSE_SENSITIVITY_MIN: f32 = 0.02;
 pub const MOUSE_SENSITIVITY_MAX: f32 = 0.20;
+
+// Map
+pub const DEFAULT_MAP_ID: usize = 1;
 pub const DEFAULT_MAP_WIDTH: usize = 14;
 pub const DEFAULT_MAP_HEIGHT: usize = 14;
 pub const DEFAULT_MAP_INCLUDE_CORNERS: bool = false;
 pub const DEFAULT_RANDOM_MAP_PATH_DEVIATION_CHANCE: usize = 60;
 pub const DEFAULT_RANDOM_MAP_HOLE_CHANCE: usize = 10;
-
-// Map
-pub const DEFAULT_MAP_ID: usize = 1;
 
 // Camera
 pub const CAMERA_HEIGHT_OFFSET: f32 = 0.1;
