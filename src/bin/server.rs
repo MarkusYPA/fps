@@ -22,16 +22,30 @@ fn main() -> std::io::Result<()> {
     let my_local_ip = local_ip().unwrap();
     let socket = UdpSocket::bind(format!("{}:{}", my_local_ip, PORT))?;
     socket.set_nonblocking(true)?;
-    let map_display = match &parsed_flags.map {
-        flags::MapIdentifier::Id(id) => id.to_string(),
-        flags::MapIdentifier::Name(name) => name.clone(),
+    println!("Server started at {}:{}", my_local_ip, PORT);
+    let random_map = parsed_flags.random_map;
+    let map_display = if parsed_flags.specific_map {
+        println!(
+            "Using specific map: {}",
+            match &parsed_flags.map {
+                flags::MapIdentifier::Id(id) => id.to_string(),
+                flags::MapIdentifier::Name(name) => name.clone(),
+                _ => panic!("Invalid map identifier"),
+            }
+        );
+        parsed_flags.map
+    } else if random_map {
+        println!("Using randomly generated map");
+        flags::MapIdentifier::Random
+    } else {
+        println!("Using random premade map");
+        flags::MapIdentifier::Id(rand::random_range(1..=3))
     };
-    println!(
-        "Server started at {}:{} using map {}",
-        my_local_ip, PORT, map_display
-    );
+    if parsed_flags.permanent_map {
+        println!("And keeping it between matches");
+    }
 
-    let current_map = parsed_flags.map;
+    let current_map = map_display;
     let mut used_map = false;
     let mut clients = HashMap::<SocketAddr, (u64, String, Instant)>::new();
     let mut client_inputs = HashMap::<u64, fps::Input>::new();
@@ -50,12 +64,21 @@ fn main() -> std::io::Result<()> {
         // Full game loop
         let mut game_state: GameState;
         _pending_win = None; // Reset pending win for new round
-        if !used_map {
+        if !used_map || parsed_flags.permanent_map {
             used_map = true;
-            game_state = GameState::new(Some(current_map.clone()));
+            game_state = GameState::new(Some(current_map.clone()), parsed_flags.rand_map_side);
         } else {
-            let random_map = rng.random_range(1..=3);
-            game_state = GameState::new(Some(flags::MapIdentifier::Id(random_map)));
+            if random_map {
+                game_state = GameState::new(
+                    Some(flags::MapIdentifier::Random),
+                    parsed_flags.rand_map_side,
+                );
+            } else {
+                game_state = GameState::new(
+                    Some(flags::MapIdentifier::Id(rng.random_range(1..=3))),
+                    None,
+                );
+            }
         }
 
         // Re-add all currently connected players to the new game
@@ -68,7 +91,10 @@ fn main() -> std::io::Result<()> {
             game_state.leaderboard.insert(username.clone(), 0);
 
             // Send initial state to reconnected players
-            let initial_state = ServerMessage::InitialState(game_state.clone());
+            let mut stripped_state = game_state.clone();
+            stripped_state.players = HashMap::new();
+            //let initial_state = ServerMessage::InitialState(game_state.clone());
+            let initial_state = ServerMessage::InitialState(stripped_state);
             utils::broadcast_message(initial_state, &socket, Some(&clients), None)?;
         }
 
