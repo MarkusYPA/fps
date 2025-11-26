@@ -63,8 +63,9 @@ pub fn load_game_textures(texture_manager: &mut TextureManager) -> Result<(), im
     texture_manager.load_texture("gun".to_string(), "assets/gun01.png")?;
     texture_manager.load_texture("gunshot".to_string(), "assets/gun01shot.png")?;
     texture_manager.load_texture("crosshair".to_string(), "assets/crosshair01.png")?;
-    texture_manager.load_texture("wall1".to_string(), "assets/wall.png")?;
-    texture_manager.load_texture("wall2".to_string(), "assets/bricks.png")?;
+    texture_manager.load_texture("wall1".to_string(), "assets/woodtiles4.png")?;
+    texture_manager.load_texture("wall2".to_string(), "assets/carpet2.png")?;
+    texture_manager.load_texture("wall3".to_string(), "assets/woodtiles2.png")?;
     texture_manager.load_texture("puddle".to_string(), "assets/bloodpuddle.png")?;
     // navigator icon used for the minimap player indicator
     texture_manager.load_texture("navigator".to_string(), "assets/navigator.png")?;
