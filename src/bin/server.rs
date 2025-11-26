@@ -37,6 +37,7 @@ fn main() -> std::io::Result<()> {
     let mut client_inputs = HashMap::<u64, fps::Input>::new();
     let mut last_shot_timestamp = HashMap::<u64, Instant>::new();
     let mut next_id: u64 = 0;
+    let mut _pending_win: Option<(String, usize)> = None; // (winner_name, score)
 
     // Create and shuffle numbers for assigning random sprites to players
     let mut rng = rng();
@@ -48,6 +49,7 @@ fn main() -> std::io::Result<()> {
     loop {
         // Full game loop
         let mut game_state: GameState;
+        _pending_win = None; // Reset pending win for new round
         if !used_map {
             used_map = true;
             game_state = GameState::new(Some(current_map.clone()));
@@ -213,14 +215,10 @@ fn main() -> std::io::Result<()> {
                                                 );
 
                                                 if new_score >= SCORE_TO_WIN {
-                                                    utils::set_winner(
-                                                        &mut game_state,
-                                                        shooter_name.clone(),
-                                                        &socket,
-                                                        &clients,
-                                                    );
-                                                    std::thread::sleep(WIN_SLEEP_TIME);
-                                                    break 'match_loop;
+                                                    // Don't end game immediately - store pending win
+                                                    // to check after death animation completes
+                                                    _pending_win =
+                                                        Some((shooter_name.clone(), new_score));
                                                 }
                                             }
                                         }
@@ -329,6 +327,27 @@ fn main() -> std::io::Result<()> {
                     sprites_changed = true;
                 }
 
+                // Send sprite updates before checking for win to ensure puddles are sent
+                if sprites_changed {
+                    utils::broadcast_message(
+                        ServerMessage::SpriteUpdate(game_state.floor_sprites.clone()),
+                        &socket,
+                        Some(&clients),
+                        None,
+                    )?;
+                }
+
+                // Check for pending win after death animations complete
+                if let Some((winner_name, _score)) = &_pending_win {
+                    let any_dying = game_state.players.values().any(|p| p.dying);
+                    if !any_dying {
+                        // All death animations complete, declare winner
+                        utils::set_winner(&mut game_state, winner_name.clone(), &socket, &clients);
+                        std::thread::sleep(WIN_SLEEP_TIME);
+                        break 'match_loop;
+                    }
+                }
+
                 // Adjust players' z if jumped
                 for player in game_state.players.values_mut() {
                     player.z += player.velocity_z;
@@ -366,15 +385,6 @@ fn main() -> std::io::Result<()> {
                     Some(&clients),
                     None,
                 )?;
-
-                if sprites_changed {
-                    utils::broadcast_message(
-                        ServerMessage::SpriteUpdate(game_state.floor_sprites.clone()),
-                        &socket,
-                        Some(&clients),
-                        None,
-                    )?;
-                }
             }
 
             // Sleep for a short duration to prevent busy-waiting, but allow for immediate processing if a message arrives
