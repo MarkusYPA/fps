@@ -23,20 +23,19 @@ pub struct GameState {
 impl GameState {
     pub fn new(
         map_identifier: Option<crate::flags::MapIdentifier>,
-        rand_width: Option<usize>,
-        rand_height: Option<usize>,
+        rand_side: Option<usize>,
     ) -> Self {
         let world = match map_identifier {
             Some(crate::flags::MapIdentifier::Id(id)) => {
-                World::new(Some(id), None, false, None, None)
+                World::new(Some(id), None, false, None)
             }
             Some(crate::flags::MapIdentifier::Name(name)) => {
-                World::new(Some(0), Some(&name), false, None, None)
+                World::new(Some(0), Some(&name), false, None)
             }
             Some(crate::flags::MapIdentifier::Random) => {
-                World::new(None, None, true, rand_width, rand_height)
+                World::new(None, None, true, rand_side)
             }
-            None => World::new(Some(1), None, false, None, None),
+            None => World::new(Some(1), None, false, None),
         };
 
         GameState {

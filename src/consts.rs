@@ -14,7 +14,7 @@ pub const FONT_PATH: &str = "assets/VT323-Regular.ttf";
 
 // Game Rules & Timing
 pub const TICK_RATE: u32 = 100;
-pub const SCORE_TO_WIN: usize = 1;
+pub const SCORE_TO_WIN: usize = 2;
 pub const WIN_SLEEP_TIME: Duration = Duration::from_secs(5);
 pub const RESPAWN_DELAY: Duration = Duration::from_secs(4);
 
@@ -25,8 +25,7 @@ pub const MOUSE_SENSITIVITY_MAX: f32 = 0.20;
 
 // Map
 pub const DEFAULT_MAP_ID: usize = 1;
-pub const DEFAULT_MAP_WIDTH: usize = 14;
-pub const DEFAULT_MAP_HEIGHT: usize = 14;
+pub const DEFAULT_MAP_SIDE: usize = 14;
 pub const DEFAULT_MAP_INCLUDE_CORNERS: bool = false;
 pub const DEFAULT_RANDOM_MAP_PATH_DEVIATION_CHANCE: usize = 60;
 pub const DEFAULT_RANDOM_MAP_HOLE_CHANCE: usize = 10;
@@ -79,7 +78,7 @@ pub const GUN_SCALE: f32 = 1.0;
 pub const GUN_X_OFFSET: usize = 190;
 pub const CROSSHAIR_SCALE: f32 = 0.5;
 pub const SHOT_TIME: Duration = Duration::from_millis(35);
-pub const SHOOT_COOLDOWN: Duration = Duration::from_millis(500);
+pub const SHOOT_COOLDOWN: Duration = Duration::from_millis(150);
 pub const SHOT_MAX_DISTANCE: f32 = 200.0;
 pub const HIT_MARKER_DURATION: Duration = Duration::from_millis(400);
 pub const DAMAGE_FLASH_DURATION: Duration = Duration::from_millis(50);

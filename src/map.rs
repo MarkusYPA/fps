@@ -1,4 +1,4 @@
-use crate::consts::{DEFAULT_MAP_HEIGHT, DEFAULT_MAP_INCLUDE_CORNERS, DEFAULT_MAP_WIDTH};
+use crate::consts::{DEFAULT_MAP_SIDE, DEFAULT_MAP_INCLUDE_CORNERS};
 use crate::utils::carve_path;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -14,14 +14,13 @@ impl World {
         id: Option<usize>,
         name: Option<&str>,
         random: bool,
-        width: Option<usize>,
-        height: Option<usize>,
+        side: Option<usize>,
     ) -> Self {
         let map_id = id.unwrap_or(1);
         let map_name = name.unwrap_or("map1");
         if random {
-            let x_size = width.unwrap_or(DEFAULT_MAP_WIDTH);
-            let y_size = height.unwrap_or(DEFAULT_MAP_HEIGHT);
+            let x_size = side.unwrap_or(DEFAULT_MAP_SIDE);
+            let y_size = side.unwrap_or(DEFAULT_MAP_SIDE);
             Self::generate_random_map(x_size, y_size)
         } else {
             match map_id {

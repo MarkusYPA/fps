@@ -12,8 +12,7 @@ pub struct Flags {
     pub specific_map: bool,
     pub permanent_map: bool,
     pub random_map: bool,
-    pub rand_map_width: Option<usize>,
-    pub rand_map_height: Option<usize>,
+    pub rand_map_side: Option<usize>,
 }
 
 pub fn parse_flags<I>(args: I) -> Option<Flags>
@@ -27,8 +26,7 @@ where
     let mut specific_map = false;
     let mut permanent_map = false;
     let mut random_map = false;
-    let mut rand_map_width = None;
-    let mut rand_map_height = None;
+    let mut rand_map_side = None;
     let args: Vec<String> = iter.collect();
     let mut i = 0;
     while i < args.len() {
@@ -58,48 +56,33 @@ where
             }
             "-rm" | "--random-map" => {
                 random_map = true;
-                // Check if width and height are provided
-                if i + 2 < args.len() {
-                    // Try to parse both numbers
-                    if let (Ok(width), Ok(height)) =
-                        (args[i + 1].parse::<usize>(), args[i + 2].parse::<usize>())
-                    {
-                        // Validate both numbers are between 4 and 100
-                        if width < 4 || width > 100 {
+                // Check if length
+                if i + 1 < args.len() {
+                    if let Ok(side) = args[i + 1].parse::<usize>() {
+                        if side < 4 || side > 100 {
                             println!(
-                                "Error: Random map width must be between 4 and 100 (got {})",
-                                width
-                            );
-                            return None;
-                        }
-                        if height < 4 || height > 100 {
-                            println!(
-                                "Error: Random map height must be between 4 and 100 (got {})",
-                                height
+                                "Error: Random map side length must be between 4 and 100 (got {})",
+                                side
                             );
                             return None;
                         }
                         // Do not allow maps with more data than 35x35
-                        if width * height > 1225 {
-                            println!("Error: Total random map size must be less than 35x35 (which is 1225 tiles), but got {}x{}, which is {} tiles", width, height, width * height);
+                        if side > 35 {
+                            println!(
+                                "Error: Total random map side length must be less than 35, but got {}",
+                                side
+                            );
                             return None;
                         }
-                        rand_map_width = Some(width);
-                        rand_map_height = Some(height);
-                        i += 3;
+                        rand_map_side = Some(side);
+                        i += 2;
                         continue;
                     } else {
                         println!(
-                            "Error: --random-map requires two valid numbers (width height) if dimensions are provided"
+                            "Error: --random-map requires a valid number (side length) if dimensions are provided"
                         );
                         return None;
                     }
-                } else if i + 1 < args.len() {
-                    // Only one number provided - error
-                    println!(
-                        "Error: --random-map requires both width and height, or neither. Only one number provided."
-                    );
-                    return None;
                 } else {
                     // No numbers provided - use defaults (None)
                     i += 1;
@@ -121,7 +104,6 @@ where
         specific_map,
         permanent_map,
         random_map,
-        rand_map_width,
-        rand_map_height,
+        rand_map_side,
     })
 }

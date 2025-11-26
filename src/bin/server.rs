@@ -66,18 +66,16 @@ fn main() -> std::io::Result<()> {
         _pending_win = None; // Reset pending win for new round
         if !used_map || parsed_flags.permanent_map {
             used_map = true;
-            game_state = GameState::new(Some(current_map.clone()), parsed_flags.rand_map_width, parsed_flags.rand_map_height);
+            game_state = GameState::new(Some(current_map.clone()), parsed_flags.rand_map_side);
         } else {
             if random_map {
                 game_state = GameState::new(
                     Some(flags::MapIdentifier::Random),
-                    parsed_flags.rand_map_width,
-                    parsed_flags.rand_map_height,
+                    parsed_flags.rand_map_side,
                 );
             } else {
                 game_state = GameState::new(
                     Some(flags::MapIdentifier::Id(rng.random_range(1..=3))),
-                    None,
                     None,
                 );
             }
