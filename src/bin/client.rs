@@ -296,7 +296,12 @@ fn main() -> Result<()> {
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     if show_menu {
-                        cursor_pos = (position.x as f32, position.y as f32);
+                        //cursor_pos = (position.x as f32, position.y as f32);
+                        let scale_factor = window_clone.scale_factor();
+                        cursor_pos = (
+                            (position.x / scale_factor) as f32,
+                            (position.y / scale_factor) as f32,
+                        );
                     }
                 }
                 WindowEvent::Focused(is_focused) => {
