@@ -93,7 +93,10 @@ fn main() -> std::io::Result<()> {
             game_state.leaderboard.insert(username.clone(), 0);
 
             // Send initial state to reconnected players
-            let initial_state = ServerMessage::InitialState(game_state.clone());
+            let mut stripped_state = game_state.clone();
+            stripped_state.players = HashMap::new();
+            //let initial_state = ServerMessage::InitialState(game_state.clone());
+            let initial_state = ServerMessage::InitialState(stripped_state);
             utils::broadcast_message(initial_state, &socket, Some(&clients), None)?;
         }
 

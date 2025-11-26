@@ -79,6 +79,11 @@ where
                             );
                             return None;
                         }
+                        // Do not allow maps with more data than 35x35
+                        if width * height > 1225 {
+                            println!("Error: Total random map size must be less than 35x35 (which is 1225 tiles), but got {}x{}, which is {} tiles", width, height, width * height);
+                            return None;
+                        }
                         rand_map_width = Some(width);
                         rand_map_height = Some(height);
                         i += 3;

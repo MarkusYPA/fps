@@ -1,5 +1,6 @@
 use crate::consts::{DEFAULT_MAP_HEIGHT, DEFAULT_MAP_INCLUDE_CORNERS, DEFAULT_MAP_WIDTH};
 use crate::utils::carve_path;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -42,7 +43,14 @@ impl World {
     }
 
     pub fn generate_random_map(x_size: usize, y_size: usize) -> Self {
-        let mut world = World { map: vec![vec![1; x_size]; y_size] };
+        let mut world: World = World { map: vec![vec![1; x_size]; y_size] };
+        // Randomly select textures for the walls
+        for y in 0..y_size {
+            for x in 0..x_size {
+                world.map[y][x] = rand::rng().random_range(1..=3);
+            }
+        };
+
         let current_tile = (x_size / 2, y_size / 2);
 
         carve_path(&mut world, current_tile, DEFAULT_MAP_INCLUDE_CORNERS, None);
