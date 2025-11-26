@@ -1,6 +1,6 @@
 use fps::{
     ClientMessage, PlayerUpdate, ServerMessage, Welcome,
-    consts::{PORT, SCORE_TO_WIN, TICK_RATE, WIN_SLEEP_TIME},
+    consts::{PORT, SCORE_TO_WIN, SHOOT_COOLDOWN, TICK_RATE, WIN_SLEEP_TIME},
     flags,
     gamestate::GameState,
     player::Player,
@@ -35,7 +35,9 @@ fn main() -> std::io::Result<()> {
     let mut used_map = false;
     let mut clients = HashMap::<SocketAddr, (u64, String, Instant)>::new();
     let mut client_inputs = HashMap::<u64, fps::Input>::new();
+    let mut last_shot_timestamp = HashMap::<u64, Instant>::new();
     let mut next_id: u64 = 0;
+    let mut _pending_win: Option<(String, usize)> = None; // (winner_name, score)
 
     // Create and shuffle numbers for assigning random sprites to players
     let mut rng = rng();
@@ -47,6 +49,7 @@ fn main() -> std::io::Result<()> {
     loop {
         // Full game loop
         let mut game_state: GameState;
+        _pending_win = None; // Reset pending win for new round
         if !used_map {
             used_map = true;
             game_state = GameState::new(Some(current_map.clone()));
@@ -171,6 +174,11 @@ fn main() -> std::io::Result<()> {
                             }
                             ClientMessage::Input(input) => {
                                 if let Some((id, _, _)) = clients.get(&src) {
+                                    // Process shoot=true immediately since mouse_pressed is only true for one frame, causing
+                                    // a later Input { shoot: false } to overwrite it in client_inputs before the tick processes it.
+                                    if input.shoot {
+                                        game_state.update(id.to_string(), &input, tick_duration);
+                                    }
                                     client_inputs.insert(*id, input);
                                 }
                             }
@@ -179,6 +187,17 @@ fn main() -> std::io::Result<()> {
                             }
                             ClientMessage::Shot => {
                                 if let Some((shooter_id, shooter_name, _)) = clients.get(&src) {
+                                    let can_shoot = last_shot_timestamp
+                                        .get(shooter_id)
+                                        .map(|last_time| last_time.elapsed() >= SHOOT_COOLDOWN)
+                                        .unwrap_or(true); // First shot is always allowed
+                                    
+                                    if !can_shoot {
+                                        continue;
+                                    }
+                                    
+                                    last_shot_timestamp.insert(*shooter_id, Instant::now());
+                                    
                                     if let Some(target_id) = game_state.measure_shot(shooter_id) {
                                         // reduce target hp
                                         if let Some(target) =
@@ -196,14 +215,10 @@ fn main() -> std::io::Result<()> {
                                                 );
 
                                                 if new_score >= SCORE_TO_WIN {
-                                                    utils::set_winner(
-                                                        &mut game_state,
-                                                        shooter_name.clone(),
-                                                        &socket,
-                                                        &clients,
-                                                    );
-                                                    std::thread::sleep(WIN_SLEEP_TIME);
-                                                    break 'match_loop;
+                                                    // Don't end game immediately - store pending win
+                                                    // to check after death animation completes
+                                                    _pending_win =
+                                                        Some((shooter_name.clone(), new_score));
                                                 }
                                             }
                                         }
@@ -312,6 +327,27 @@ fn main() -> std::io::Result<()> {
                     sprites_changed = true;
                 }
 
+                // Send sprite updates before checking for win to ensure puddles are sent
+                if sprites_changed {
+                    utils::broadcast_message(
+                        ServerMessage::SpriteUpdate(game_state.floor_sprites.clone()),
+                        &socket,
+                        Some(&clients),
+                        None,
+                    )?;
+                }
+
+                // Check for pending win after death animations complete
+                if let Some((winner_name, _score)) = &_pending_win {
+                    let any_dying = game_state.players.values().any(|p| p.dying);
+                    if !any_dying {
+                        // All death animations complete, declare winner
+                        utils::set_winner(&mut game_state, winner_name.clone(), &socket, &clients);
+                        std::thread::sleep(WIN_SLEEP_TIME);
+                        break 'match_loop;
+                    }
+                }
+
                 // Adjust players' z if jumped
                 for player in game_state.players.values_mut() {
                     player.z += player.velocity_z;
@@ -349,15 +385,6 @@ fn main() -> std::io::Result<()> {
                     Some(&clients),
                     None,
                 )?;
-
-                if sprites_changed {
-                    utils::broadcast_message(
-                        ServerMessage::SpriteUpdate(game_state.floor_sprites.clone()),
-                        &socket,
-                        Some(&clients),
-                        None,
-                    )?;
-                }
             }
 
             // Sleep for a short duration to prevent busy-waiting, but allow for immediate processing if a message arrives

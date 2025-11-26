@@ -18,7 +18,7 @@ use winit_input_helper::WinitInputHelper;
 use fps::{
     AnimationState::{Dying, Walking},
     ClientMessage, Input, ServerMessage,
-    consts::{DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, MOUSE_SENSITIVITY_MAX, MOUSE_SENSITIVITY_MIN, PORT, WALK_FRAME_TIME, WIDTH},
+    consts::{CLOSE_MENU_ON_NEW_GAME, DIE_FRAME_TIME, HEIGHT, MOUSE_SPEED, MOUSE_SENSITIVITY_MAX, MOUSE_SENSITIVITY_MIN, PORT, SHOOT_COOLDOWN, WALK_FRAME_TIME, WIDTH},
     gamestate::GameState,
     player::Player,
     renderer::{MenuHover, Renderer},
@@ -264,6 +264,7 @@ fn main() -> Result<()> {
     let mut prev_input: Option<Input> = None;
     let mut focused = false;
     let mut last_frame_time = Instant::now();
+    let mut last_shot_timestamp = Instant::now().checked_sub(SHOOT_COOLDOWN).unwrap_or(Instant::now());
     let mut show_menu = false;
     let mut config = load_config();
     let mut mouse_sensitivity = config
@@ -315,9 +316,12 @@ fn main() -> Result<()> {
                         renderer.draw_to_buffer(pixels.frame_mut());
                         renderer.display_health(gs, my_id, pixels.frame_mut());
                         renderer.display_leaderboard(gs, pixels.frame_mut());
+                        renderer.took_damage(pixels.frame_mut());
 
-                        if let Some(winner) = &gs.winner {
-                            renderer.display_winner(&winner, pixels.frame_mut());
+                        if !show_menu {
+                            if let Some(winner) = &gs.winner {
+                                renderer.display_winner(&winner, pixels.frame_mut());
+                            }
                         }
 
                         // Display menu if it's open
@@ -361,26 +365,22 @@ fn main() -> Result<()> {
                     mouse_dx = 0.0;
                     mouse_dy = 0.0;
 
-                    if let Some(ref gs) = game_state {
-                        if gs.winner.is_none() {
-                            let zero_input = Input {
-                                forth: false,
-                                back: false,
-                                left: false,
-                                right: false,
-                                turn: 0.0,
-                                pitch: 0.0,
-                                jump: false,
-                                sprint: false,
-                                shoot: false,
-                            };
-                            let encoded_input = bincode::serialize(&ClientMessage::Input(zero_input)).unwrap();
-                            if let Err(e) = socket.send(&encoded_input) {
-                                eprintln!("Error sending zero input: {}", e);
-                            }
-                            prev_input = None;
-                        }
+                    let zero_input = Input {
+                        forth: false,
+                        back: false,
+                        left: false,
+                        right: false,
+                        turn: 0.0,
+                        pitch: 0.0,
+                        jump: false,
+                        sprint: false,
+                        shoot: false,
+                    };
+                    let encoded_input = bincode::serialize(&ClientMessage::Input(zero_input)).unwrap();
+                    if let Err(e) = socket.send(&encoded_input) {
+                        eprintln!("Error sending zero input: {}", e);
                     }
+                    prev_input = None;
                 } else {
                     // Re-grab cursor when menu closes
                     center_and_grab_cursor(window_clone.clone());
@@ -460,11 +460,16 @@ fn main() -> Result<()> {
                     turn += 1.0;
                 }
 
-                if input.mouse_pressed(MouseButton::Left) {
+                let can_shoot = last_shot_timestamp.elapsed() >= SHOOT_COOLDOWN;
+                let mouse_pressed = input.mouse_pressed(MouseButton::Left);
+                
+                if mouse_pressed && can_shoot {
                     let shot_message = ClientMessage::Shot;
                     let encoded_shot = bincode::serialize(&shot_message).unwrap();
                     if let Err(e) = socket.send(&encoded_shot) {
                         eprintln!("Error sending shot data: {}", e);
+                    } else {
+                        last_shot_timestamp = Instant::now();
                     }
                 }
 
@@ -477,7 +482,7 @@ fn main() -> Result<()> {
                     pitch: -mouse_dy * mouse_sensitivity, // Invert mouse_dy for natural pitch control
                     jump: input.key_pressed(KeyCode::Space),
                     sprint: input.key_held(KeyCode::ShiftLeft),
-                    shoot: input.mouse_pressed(MouseButton::Left),
+                    shoot: mouse_pressed && can_shoot,
                 };
                 mouse_dx = 0.0;
                 mouse_dy = 0.0;
@@ -506,6 +511,13 @@ fn main() -> Result<()> {
                             }
                             ServerMessage::InitialState(initial_state) => {
                                 game_state = Some(initial_state);
+                                // Reset menu state when a new game starts
+                                if show_menu && CLOSE_MENU_ON_NEW_GAME {
+                                    show_menu = false;
+                                    center_and_grab_cursor(window_clone.clone());
+                                    cursor_grabbed = true;
+                                    first_mouse_move = true;
+                                }
                             }
                             ServerMessage::GameUpdate(player_updates) => {
                                 if let Some(ref mut gs) = game_state {
@@ -555,6 +567,7 @@ fn main() -> Result<()> {
                                     renderer.show_hit_marker(0x00FFFFFF);
                                 } else if hit.target_id == my_id {
                                     println!("{} shot me", hit.shooter_name);
+                                    renderer.show_damage_flash();
                                 }
                             }
                             ServerMessage::LeaderboardUpdate(leaderboard) => {

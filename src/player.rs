@@ -72,34 +72,32 @@ impl Player {
                 slower = 0.707;
             }
 
+            let mut sprint_mult = 1.0;
+            if input.sprint {
+                sprint_mult = PLAYER_SPRINT_SPEED_MULTIPLIER;
+            }
+
             if input.forth {
-                new_x += self.angle.cos() * self.move_speed * slower;
-                new_y += self.angle.sin() * self.move_speed * slower;
+                new_x += self.angle.cos() * self.move_speed * slower * sprint_mult;
+                new_y += self.angle.sin() * self.move_speed * slower * sprint_mult;
             }
 
             if input.back {
-                new_x -= self.angle.cos() * self.move_speed * slower;
-                new_y -= self.angle.sin() * self.move_speed * slower;
+                new_x -= self.angle.cos() * self.move_speed * slower * sprint_mult;
+                new_y -= self.angle.sin() * self.move_speed * slower * sprint_mult;
             }
 
             let strafe_x = -self.angle.sin();
             let strafe_y = self.angle.cos();
 
             if input.right {
-                new_x += strafe_x * self.move_speed * slower;
-                new_y += strafe_y * self.move_speed * slower;
+                new_x += strafe_x * self.move_speed * slower * sprint_mult;
+                new_y += strafe_y * self.move_speed * slower * sprint_mult;
             }
 
             if input.left {
-                new_x -= strafe_x * self.move_speed * slower;
-                new_y -= strafe_y * self.move_speed * slower;
-            }
-
-            if input.sprint {
-                new_x +=
-                    self.angle.cos() * self.move_speed * PLAYER_SPRINT_SPEED_MULTIPLIER * slower;
-                new_y +=
-                    self.angle.sin() * self.move_speed * PLAYER_SPRINT_SPEED_MULTIPLIER * slower;
+                new_x -= strafe_x * self.move_speed * slower * sprint_mult;
+                new_y -= strafe_y * self.move_speed * slower * sprint_mult;
             }
 
             self.check_collision_and_move(new_x, new_y, world);
